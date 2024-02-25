@@ -1,8 +1,8 @@
 #!/bin/sh
 #-----------------------------------------------------------------------------#
-# eFa 5.0.0-x cumulative updates script
+# eFa 5x cumulative updates script
 #-----------------------------------------------------------------------------#
-# Copyright (C) 2013~2023 https://efa-project.org
+# Copyright (C) 2013~2024 https://efa-project.org
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -87,6 +87,14 @@ cmd='chmod -R 750 /var/spool/postfix/hold'
 execcmd
 cmd='chmod -R 750 /var/spool/postfix/incoming'
 execcmd
+
+if [[ -z $(grep smtpd_forbid_bare_newline /etc/postfix/main.cf) ]]; then
+    # Protect against SMTP smuggling
+    postconf -e "smtpd_forbid_unauth_pipelining = yes"
+    postconf -e "smtpd_discard_ehlo_keywords = chunking, silent-discard"
+    postconf -e "smtpd_forbid_bare_newline = yes"
+    postconf -e "smtpd_forbid_bare_newline_exclusions = \$mynetworks"
+fi
 
 # Enable maintenance mode if not enabled
 MAINT=0

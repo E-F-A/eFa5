@@ -494,14 +494,12 @@ if [[ "$1" == "2" || "$flag" == "1" ]]; then
     # Perform Update tasks
     echo -e "\nPreparing to update eFa..."
 
-    # 5.0.0-x cumulative fixes
-    if [[ %{version} == "5.0.0" || "$flag" == "1" ]]; then
-      {
-        /bin/sh %{_usrsrc}/eFa/updates/update-5.0.0.sh
-        [[ $? -ne 0 ]] && echo "Error while updating eFa, Please visit https://efa-project.org to report the commands executed above." && exit 0
-      } 2>&1 | tee -a /var/log/eFa/update.log
-    fi
-   
+    # v5 cumulative fixes
+    {
+      /bin/sh %{_usrsrc}/eFa/updates/update.sh
+      [[ $? -ne 0 ]] && echo "Error while updating eFa, Please visit https://efa-project.org to report the commands executed above." && exit 0
+    } 2>&1 | tee -a /var/log/eFa/update.log
+       
     # cleanup if sucessful
     rm -rf /usr/src/eFa
     echo "eFa-%{version}-%{releasenum}" > %{_sysconfdir}/eFa-Version
@@ -537,6 +535,9 @@ rm -rf $RPM_BUILD_ROOT
 %attr(0644, root, root) %{_sysconfdir}/logrotate.d/eFa-logrotate
 
 %changelog
+* Sun Feb 25 2024 eFa Project <shawniverson@efa-project.org> - 5.0.0-3
+- Update postfix
+
 * Wed Dec 27 2023 eFa Project <shawniverson@efa-project.org> - 5.0.0-2
 - Update MailScanner
 
