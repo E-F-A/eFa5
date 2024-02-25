@@ -126,7 +126,7 @@ Patch14: pflogsumm-1.1.5-syslog-name-underscore-fix.patch
 # rhbz#2134789, backported feature from upstream
 Patch16: postfix-3.5.9-SRV-resolve.patch
 # rhbz#2193363 ZUUL CI uses kernel 6 and we have to add this to postfix
-Patch17: postfix-3.5.9-makedefs.patch
+#Patch17: postfix-3.5.9-makedefs.patch
 
 # Optional patches - set the appropriate environment variables to include
 #                    them when building the package/spec file
@@ -283,7 +283,7 @@ popd
 %patch14 -p1 -b .pflogsumm-1.1.5-syslog-name-underscore-fix
 #%patch15 -p1 -b .coverity-fix
 %patch16 -p1 -b .SRV-resolution
-%patch17 -p1 -b .makedefs
+#%patch17 -p1 -b .makedefs
 
 for f in README_FILES/TLS_{LEGACY_,}README TLS_ACKNOWLEDGEMENTS; do
 	iconv -f iso8859-1 -t utf8 -o ${f}{_,} &&
