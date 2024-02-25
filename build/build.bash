@@ -39,7 +39,7 @@ mkdir -p $(dirname "${LOGFILE}")
 ( [ -e "$LOGFILE" ] || touch "$LOGFILE" ) && [ ! -w "$LOGFILE" ] && echo "Unable to create or write to $LOGFILE"
 
 function logthis() {
-    TAG='EFA4'
+    TAG='EFA5'
     MSG="$1"
     $LOGGER -t "$TAG" "$MSG"
     echo "`date +%Y.%m.%d-%H:%M:%S` - $MSG"

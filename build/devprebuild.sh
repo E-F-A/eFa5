@@ -32,7 +32,7 @@ fi
 # check if we run CentOS 9
 OSVERSION=`cat /etc/redhat-release`
 if [[ $OSVERSION =~ .*'release 9'.* ]]; then
-  logthis "Good you are running CentOS 9 or similar flavor"
+  echo "Good you are running CentOS 9 or similar flavor"
   RELEASE=9
 else
   echo "- ERROR: You are not running CentOS 9 or similar flavor"
