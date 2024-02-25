@@ -24,7 +24,7 @@ index 89f9e9b..ca8899f 100644
 --- a/proto/postconf.proto
 +++ b/proto/postconf.proto
 @@ -17763,7 +17763,114 @@ value to disable the feature. </p>
- 
+
  <p> This feature was backported from Postfix 3.6 to Postfix versions
  3.5.9, 3.4.19, 3.3.16. 3.2.21. </p>
 -
