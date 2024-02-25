@@ -141,23 +141,15 @@ fi
 # Add eFa Repo
 #-----------------------------------------------------------------------------#
 case "$action" in
-    # ("testing"|"kstesting"|"testingnoefa")
-    #    if [[ ! -f /etc/yum.repos.d/eFa4-testing.repo ]]; then
-    #         if [[ $RELEASE -eq 7 ]]; then
-    #             logthis "Adding eFa CentOS 7 Testing Repo"
-    #             mkdir -p /usr/src/eFa
-    #             curl -sSL $mirror/rpm/eFa4/RPM-GPG-KEY-eFa-Project > /usr/src/eFa/RPM-GPG-KEY-eFa-Project
-    #             rpm --import /usr/src/eFa/RPM-GPG-KEY-eFa-Project
-    #             curl -L $mirror/rpm/eFa4/eFa4-testing.repo -o /etc/yum.repos.d/eFa4-testing.repo
-    #         else
-    #             logthis "Adding eFa CentOS 8 Testing Repo"
-    #             mkdir -p /usr/src/eFa
-    #             curl -sSL $mirror/rpm/eFa4/RPM-GPG-KEY-eFa-Project > /usr/src/eFa/RPM-GPG-KEY-eFa-Project
-    #             rpm --import /usr/src/eFa/RPM-GPG-KEY-eFa-Project
-    #             curl -L $mirror/rpm/eFa4/CentOS8/eFa4-centos8-testing.repo -o /etc/yum.repos.d/eFa4-testing.repo
-    #         fi
-    #    fi
-    #    ;;
+    ("testing"|"kstesting"|"testingnoefa")
+       if [[ ! -f /etc/yum.repos.d/eFa5-test.repo ]]; then
+            logthis "Adding eFa CentOS 9 test Repo"
+            mkdir -p /usr/src/eFa
+            curl -sSL $mirror/rpm/eFa5/centos9/RPM-GPG-KEY-eFa-Project-256 > /usr/src/eFa/RPM-GPG-KEY-eFa-Project-256
+            rpm --import /usr/src/eFa/RPM-GPG-KEY-eFa-Project-256
+            curl -L $mirror/rpm/eFa5/centos9/eFa5-test.repo -o /etc/yum.repos.d/eFa5-test.repo
+       fi
+       ;;
     
     ("dev"|"ksdev"|"devnoefa")
        if [[ ! -f /etc/yum.repos.d/eFa5-dev.repo ]]; then
