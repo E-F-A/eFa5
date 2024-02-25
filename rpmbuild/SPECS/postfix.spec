@@ -122,7 +122,7 @@ Patch12: postfix-3.5.9-glibc-234-build-fix.patch
 Patch13: postfix-3.5.9-whitespace-name-fix.patch
 Patch14: pflogsumm-1.1.5-syslog-name-underscore-fix.patch
 # rhbz#1938847, backported from upstream
-Patch15: postfix-3.5.9-coverity-fix.patch
+# Patch15: postfix-3.5.9-coverity-fix.patch
 # rhbz#2134789, backported feature from upstream
 Patch16: postfix-3.5.9-SRV-resolve.patch
 # rhbz#2193363 ZUUL CI uses kernel 6 and we have to add this to postfix
@@ -281,7 +281,7 @@ popd
 %patch12 -p1 -b .glibc-234-build-fix
 %patch13 -p1 -b .whitespace-name-fix
 %patch14 -p1 -b .pflogsumm-1.1.5-syslog-name-underscore-fix
-%patch15 -p1 -b .coverity-fix
+#%patch15 -p1 -b .coverity-fix
 %patch16 -p1 -b .SRV-resolution
 %patch17 -p1 -b .makedefs
 
