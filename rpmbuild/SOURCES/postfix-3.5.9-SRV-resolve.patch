@@ -136,9 +136,9 @@ index 89f9e9b..ca8899f 100644
 +
 +<p> This feature was backported from Postfix 3.8. </p>
 +
- %PARAM tls_config_name
+%PARAM tls_config_name
 
- <p> The application name passed by Postfix to OpenSSL library
+<p> The application name passed by Postfix to OpenSSL library
 diff --git a/src/dns/dns.h b/src/dns/dns.h
 index 3631d23..2af1ee2 100644
 --- a/src/dns/dns.h
