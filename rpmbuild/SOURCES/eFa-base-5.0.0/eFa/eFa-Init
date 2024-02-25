@@ -1,0 +1,968 @@
+#!/bin/bash
+#-----------------------------------------------------------------------------#
+# eFa 5.0.0 initial configuration script
+# v1 legacy script
+#-----------------------------------------------------------------------------#
+# Copyright (C) 2013~2024 https://efa-project.org
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#-----------------------------------------------------------------------------#
+
+# +---------------------------------------------------+
+# Lets start asking questions.
+# +---------------------------------------------------+
+function func_ask-hostname() {
+  func_echo-header
+  echo -e "$green[eFa]$clean What is the hostname of this machine? $cyan(Single Word)$clean"
+  echo -e -n "$green[eFa]$clean : "
+  read HOSTNAME
+  hncheck=1
+  while [ $hncheck != 0 ]
+   do
+     if [[ $HOSTNAME =~ ^[-a-zA-Z0-9]{2,256}+$ ]]
+      then
+        hncheck=0
+      else
+        echo -e "       $red ERROR: The hostname $HOSTNAME seems to be invalid"
+        echo -e "        ERROR: please re-enter the hostname$clean"
+        echo -e "$green[eFa]$clean What is the hostname of this machine: $cyan(single Word)$clean"
+        echo -e -n "$green[eFa]$clean : "
+        read HOSTNAME
+     fi
+    done
+}
+
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+function func_ask-domainname() {
+  func_echo-header
+  echo -e "$green[eFa]$clean Please enter the domain name for this machine"
+  echo -e -n "$green[eFa]$clean : "
+  read DOMAINNAME
+  dncheck=1
+  while [ $dncheck != 0 ]
+   do
+    if [[ $DOMAINNAME =~ ^[a-zA-Z0-9]+([\-\.]{1}[a-zA-Z0-9-]+)*$ ]]
+      then
+        dncheck=0
+      else
+        echo -e "       $red ERROR: The domain $DOMAINNAME seems to be invalid"
+        echo -e "        ERROR: please re-enter the domain$clean"
+        echo -e "$green[eFa]$clean Please enter the domain name for this machine"
+        echo -e -n "$green[eFa]$clean : "
+        read DOMAINNAME
+     fi
+    done
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+function func_ask-email() {
+  func_echo-header
+  echo -e "$green[eFa]$clean Please enter the email address for eFa"
+  echo -e "$green[eFa]$clean This email is for eFa notifications and yum-cron"
+  echo -e -n "$green[eFa]$clean : "
+  read ADMINEMAIL
+  adminemailcheck=1
+  while [ $adminemailcheck != 0 ]
+   do
+     if [[ $ADMINEMAIL =~ ^[-_.@Aa-zA-Z0-9]{2,256}+[a-zA-Z0-9]+([\-\.]{1}[a-zA-Z0-9]+)*\.[a-z]{2,15}$ ]]
+      then
+        adminemailcheck=0
+      else
+        echo -e "       $red ERROR: The address $ADMINEMAIL seems to be invalid"
+        echo -e "        ERROR: please re-enter the admin email address$clean"
+        echo -e "$green[eFa]$clean Please enter the email address of an admin "
+        echo -e "$green[eFa]$clean This user will receive eFa related notifications"
+        echo -e -n "$green[eFa]$clean : "
+        read ADMINEMAIL
+     fi
+   done
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+function func_ask-ipv4address() {
+  func_echo-header
+
+  # Display current IP and ask for new, then validate the IP.
+  #CIPV4ADDRESS=`ifconfig $INTERFACE | grep inet\ | awk '{print $2}'`
+  CIPV4ADDRESS=$(ip add show dev $INTERFACE | grep inet\  | grep -v inet\ 127. | awk '{print $2}' | awk -F'/' '{print $1}')
+  echo -e ""
+  echo -e "$green[eFa]$clean Your current IP address is: $CIPADDRESS"
+  echo -e ""
+  echo -e "$green[eFa]$clean Please enter the IP address"
+  echo -e -n "$green[eFa]$clean : "
+  read -i "$CIPV4ADDRESS" -e IPV4ADDRESS
+  ipcheck=1
+  while [ $ipcheck != 0 ]
+   do
+    if checkip $IPV4ADDRESS
+     then
+       ipcheck=0
+     else
+       echo -e "       $red ERROR: The IP $IPV4ADDRESS seems to be invalid"
+       echo -e "        ERROR: Please re-enter the IP$clean"
+       echo -e "$green[eFa]$clean Please enter the IP address"
+       echo -e -n "$green[eFa]$clean : "
+       read IPV4ADDRESS
+    fi
+   done
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+function func_ask-ipv6address() {
+  func_echo-header
+
+  # Display current IP and ask for new, then validate the IP.
+  #CIPV6ADDRESS=`ifconfig $INTERFACE | grep inet6\ | grep global | awk '{print $2}'`
+  CIPV6ADDRESS=$(ip add show dev $INTERFACE | grep inet6 | grep -v inet6\ ::1 | grep global | awk '{print $2}' | awk -F'/' '{print $1}')
+  echo -e ""
+  echo -e "$green[eFa]$clean Your current IPv6 address is: $CIPV6ADDRESS"
+  echo -e ""
+  echo -e "$green[eFa]$clean Please enter the IP address"
+  echo -e -n "$green[eFa]$clean : "
+  read -i "$CIPV6ADDRESS" -e IPV6ADDRESS
+  ipcheck=1
+  while [ $ipcheck != 0 ]
+   do
+    if checkip6 $IPV6ADDRESS
+     then
+       ipcheck=0
+     else
+       echo -e "       $red ERROR: The IP $IPV6ADDRESS seems to be invalid"
+       echo -e "        ERROR: Please re-enter the IP$clean"
+       echo -e "$green[eFa]$clean Please enter the IP address"
+       echo -e -n "$green[eFa]$clean : "
+       read IPV6ADDRESS
+    fi
+   done
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+function func_ask-ipv6mask() {
+  func_echo-header
+
+  # Display current ipv6 mask and ask for new, then validate the mask
+  CIPV6MASK=`ip add show $INTERFACE | grep inet6\ | grep global | awk '{print $2}' | awk -F'/' '{print $2}'`
+  echo -e ""
+  echo -e "$green[eFa]$clean Your current ipv6 prefix is: $CIPV6MASK"
+  echo -e ""
+  echo -e "$green[eFa]$clean Please enter the IPv6 prefix"
+  echo -e -n "$green[eFa]$clean : "
+  read -i "$CIPV6MASK" -e IPV6MASK
+  nmcheck=1
+  while [ $nmcheck != 0 ]
+   do
+    # Between 1 and 128, power of 2
+    if [[ $IPV6MASK =~ ^[0-9]{1,3}$ && $IPV6MASK -ge 1 && $IPV6MASK -le 128 && $(( $IPV6MASK & ($IPV6MASK - 1) )) -eq 0 ]]; then
+       nmcheck=0
+     else
+       echo -e "       $red ERROR: The ipv6 MASK $IPV6MASK seems to be invalid"
+       echo -e "        ERROR: Please re-enter the ipv6 MASK$clean"
+       echo -e "$green[eFa]$clean Please enter the ipv6 MASK"
+       echo -e -n "$green[eFa]$clean : "
+       read IPV6MASK
+    fi
+   done
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+function func_ask-ipv4netmask() {
+  func_echo-header
+
+  # Display current netmask and ask for new, then validate the netmask
+  #CIPV4NETMASK=`ifconfig $INTERFACE | grep inet\ | awk '{print $4}'`
+  CIPV4NETMASK=$(ip add show dev $INTERFACE | grep inet\  | grep -v inet\ 127. | awk '{print $2}' | xargs ipcalc -m | awk -F'=' {'print $2'})
+  echo -e ""
+  echo -e "$green[eFa]$clean Your current netmask is: $CIPV4NETMASK"
+  echo -e ""
+  echo -e "$green[eFa]$clean Please enter the IP v4 NETMASK"
+  echo -e -n "$green[eFa]$clean : "
+  read -i "$CIPV4NETMASK" -e IPV4NETMASK
+  nmcheck=1
+  while [ $nmcheck != 0 ]
+   do
+    if checkip $IPV4NETMASK
+     then
+       nmcheck=0
+     else
+       echo -e "       $red ERROR: The NETMASK $IPV4NETMASK seems to be invalid"
+       echo -e "        ERROR: Please re-enter the NETMASK$clean"
+       echo -e "$green[eFa]$clean Please enter the NETMASK"
+       echo -e -n "$green[eFa]$clean : "
+       read IPV4NETMASK
+    fi
+   done
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+function func_ask-ipv4gateway() {
+  func_echo-header
+
+  # Display current gateway
+  #CIPV4GATEWAY=`route -n | grep $INTERFACE | grep 0.0.0.0 | awk '{print $2}' | grep -v 0.0.0.0`
+  CIPV4GATEWAY=$(ip -4 route list default dev $INTERFACE | awk {'print $3'})
+  echo -e ""
+  echo -e "$green[eFa]$clean Your current default gateway is: $CIPV4GATEWAY"
+  echo -e ""
+  echo -e "$green[eFa]$clean Please enter the default gateway address"
+  echo -e -n "$green[eFa]$clean : "
+  read -i "$CIPV4GATEWAY" -e IPV4GATEWAY
+  gwcheck=1
+  while [ $gwcheck != 0 ]
+   do
+    if checkip $IPV4GATEWAY
+     then
+       gwcheck=0
+     else
+       echo -e "       $red ERROR: The GATEWAY $IPV4GATEWAY seems to be invalid"
+       echo -e "        ERROR: Please re-enter the GATEWAY$clean"
+       echo -e "$green[eFa]$clean Please enter the default IP  v4 gateway address"
+       echo -e -n "$green[eFa]$clean : "
+       read IPV4GATEWAY
+    fi
+   done
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+function func_ask-ipv6gateway() {
+  func_echo-header
+
+  # Display current gateway
+  #CIPV6GATEWAY=`route -n -6 | grep UG | grep ::/0 | awk '{print $2}'`
+  CIPV6GATEWAY=$(ip -6 route list default dev $INTERFACE | awk {'print $3'})
+  echo -e ""
+  echo -e "$green[eFa]$clean Your current default gateway is: $CIPV6GATEWAY"
+  echo -e ""
+  echo -e "$green[eFa]$clean Please enter the default gateway address"
+  echo -e -n "$green[eFa]$clean : "
+  read -i "$CIPV6GATEWAY" -e IPV6GATEWAY
+  gwcheck=1
+  while [ $gwcheck != 0 ]
+   do
+    if checkip6 $IPV6GATEWAY
+     then
+       gwcheck=0
+     else
+       echo -e "       $red ERROR: The GATEWAY $IPV6GATEWAY seems to be invalid"
+       echo -e "        ERROR: Please re-enter the GATEWAY$clean"
+       echo -e "$green[eFa]$clean Please enter the default IP v6 gateway address"
+       echo -e -n "$green[eFa]$clean : "
+       read IPV6GATEWAY
+    fi
+   done
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+function func_ask-recursion() {
+  func_echo-header
+
+  # Prompt on whether to recurse or to forward
+  echo -e ""
+  echo -e "$green[eFa]$clean eFa supports full DNS recursion."
+  echo -e "$green[eFa]$clean Doing so prevents common problems using DNS blocklists."
+  echo -e "$green[eFa]$clean Alternatively, you can choose to forward DNS to your"
+  echo -e "$green[eFa]$clean DNS servers or your ISP's DNS servers."
+  echo -e "$green[eFa]$clean Port 53 outbound must be allowed for recursion to function."
+  echo -e ""
+  echo -e -n "$green[eFa]$clean Enable full recursive DNS? (Y/n): "
+  read RECURSE
+  recursecheck=0
+  while [ $recursecheck -eq 0 ]
+    do
+      if [[ $RECURSE =~ ^[Yy]$ || -z $RECURSE ]]; then
+        recursecheck=1
+        enablerecursion=1
+        DNS1=""
+        DNS2=""
+      elif [[ $RECURSE =~ ^[Nn]$ ]]; then
+        recursecheck=1
+        enablerecursion=0
+        func_ask-dns1
+        func_ask-dns2
+      else
+        echo -e "       $red ERROR: Invalid choice$clean"
+        echo -e ""
+        echo -e -n "$green[eFa]$clean Enable full recursive DNS? (Y/n): "
+        read RECURSE
+      fi
+    done
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+function func_ask-dns1() {
+  func_echo-header
+  if [[ "$enablerecursion" -eq 1 ]]; then
+    echo -e "$red[eFa] Recursion is enabled.  Disable recursion to use DNS forwarders.$clean"
+    pause
+    return
+  fi
+  # Display current primary dns
+  CDNS1=`grep nameserver /etc/resolv.conf | awk '{print $2}' | sed -n 1p`
+  echo -e ""
+  echo -e "$green[eFa]$clean Your current primary DNS is: $CDNS1"
+  echo -e ""
+  echo -e "$green[eFa]$clean Please enter the primary DNS server address"
+  echo -e -n "$green[eFa]$clean : "
+  read -i "$CDNS1" -e DNS1
+  dns1check=1
+  while [ $dns1check != 0 ]
+   do
+    if checkip $DNS1
+     then
+       dns1check=0
+    elif checkip6 $DNS1
+      then
+        dns1check=0
+    else
+       echo -e "       $red ERROR: The DNS server $DNS1 seems to be invalid"
+       echo -e "        ERROR: Please re-enter the primary DNS$clean"
+       echo -e "$green[eFa]$clean Please enter the primary DNS server address"
+       echo -e -n "$green[eFa]$clean : "
+       read DNS1
+    fi
+   done
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+function func_ask-dns2() {
+  func_echo-header
+
+  if [[ "$enablerecursion" -eq 1 ]]; then
+    echo -e "$red[eFa] Recursion is enabled.  Disable recursion to use DNS forwarders.$clean"
+    pause
+    return
+  fi
+
+  # Display current secondary dns
+  CDNS2=`grep nameserver /etc/resolv.conf | awk '{print $2}' | sed -n 2p`
+  echo -e ""
+  echo -e "$green[eFa]$clean Your current secondary DNS is: $CDNS2"
+  echo -e ""
+  echo -e "$green[eFa]$clean Please enter the secondary DNS server address"
+  echo -e -n "$green[eFa]$clean : "
+  read -i "$CDNS2" -e DNS2
+  dns2check=1
+  while [ $dns2check != 0 ]
+   do
+    if checkip $DNS2
+      then
+        dns2check=0
+    elif checkip6 $DNS2
+      then
+        dns2check=0
+    else
+       echo -e "       $red ERROR: The DNS server $DNS2 seems to be invalid"
+       echo -e "        ERROR: Please re-enter the secondary DNS$clean"
+       echo -e "$green[eFa]$clean Please enter the secondary DNS server address"
+       echo -e -n "$green[eFa]$clean : "
+       read DNS2
+    fi
+   done
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+function func_ask-webusername() {
+  func_echo-header
+  echo -e "$green[eFa]$clean Please enter the user-name you would like to have."
+  echo -e "$green[eFa]$clean This user will be used to logon to the webinterface."
+  echo -e -n "$green[eFa]$clean : "
+  read USERNAME
+  uncheck=1
+  while [ $uncheck != 0 ]
+   do
+     if [[ $USERNAME =~ ^[a-z_][a-z0-9_-]{1,30}+$ ]]
+      then
+        uncheck=0
+     elif [[ $USERNAME =~ ^[-_.@Aa-zA-Z0-9]{2,256}+[a-zA-Z0-9]+([\-\.]{1}[a-zA-Z0-9]+)*\.[a-z]{2,15}$ ]]
+       then
+        uncheck=0
+      else
+        echo -e "       $red ERROR: The user-name $USERNAME seems to be invalid"
+        echo -e "        ERROR: please re-enter the user-name$clean"
+        echo -e "$green[eFa]$clean Please enter the user-name you would like to have."
+        echo -e -n "$green[eFa]$clean : "
+        read USERNAME
+     fi
+    done
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+function func_ask-webuserpassword() {
+  func_echo-header
+  echo -e "$green[eFa]$clean Please enter the password for the web user."
+  echo -e "$green[eFa]$clean This password will also be used to logon to the webinterface"
+  echo -e -n "$green[eFa]$clean Password: "
+  read -s efauserpwd
+  echo -e ""
+  echo -e -n "$green[eFa]$clean Password Again: "
+  read -s efauserpwd2
+  efauserpwdcheck=1
+  while [ $efauserpwdcheck != 0 ]
+   do
+     if [[ $efauserpwd = "$efauserpwd2" ]]
+          then
+            efauserpwdcheck=0
+         else
+            echo -e ""
+            echo -e "       $red ERROR: The passwords do not seem to match"
+            echo -e "        ERROR: Please try again$clean"
+            echo -e "$green[eFa]$clean Please enter the password for the web user."
+            echo -e -n "$green[eFa]$clean Password: "
+            read -s efauserpwd
+            echo -e ""
+            echo -e -n "$green[eFa]$clean Password Again: "
+            read -s efauserpwd2
+     fi
+  done
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+function func_ask-cliusername() {
+  func_echo-header
+  echo -e "$green[eFa]$clean Please enter the user-name you would like to have."
+  echo -e "$green[eFa]$clean This user will be used to logon to the shell"
+  echo -e -n "$green[eFa]$clean : "
+  read CLIUSERNAME
+  uncheck=1
+  while [ $uncheck != 0 ]
+   do
+     if [[ $CLIUSERNAME =~ ^[a-z_][a-z0-9_-]{1,30}+$ ]]
+      then
+        if [[ -z $( cat /etc/passwd | awk -F":" '{print $1}' | grep -e "^$CLIUSERNAME$") ]]
+          then
+            uncheck=0
+          else
+            echo -e "       $yellow WARNING: The user-name $CLIUSERNAME already exists"
+            echo -e -n "$green[eFa]$clean Continue (User data will be removed)? (y/N): "
+            read YESNO
+            if [[ $YESNO =~ ^[Yy]$ ]]; then
+              uncheck=0
+            else
+              echo -e "$green[eFa]$clean Please enter the user-name you would like to have."
+              echo -e "$green[eFa]$clean This user will be used to logon to the shell"
+              echo -e -n "$green[eFa]$clean : "
+              read CLIUSERNAME
+            fi
+        fi
+      else
+        echo -e "       $red ERROR: The user-name $CLIUSERNAME seems to be invalid"
+        echo -e "        ERROR: please re-enter the user-name$clean"
+        echo -e "$green[eFa]$clean Please enter the user-name you would like to have."
+        echo -e -n "$green[eFa]$clean : "
+        read CLIUSERNAME
+     fi
+    done
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+function func_ask-clipassword() {
+  func_echo-header
+  echo -e "$green[eFa]$clean Please enter the password for the cli user."
+  echo -e "$green[eFa]$clean This password is needed in case you need to"
+  echo -e "$green[eFa]$clean work in the shell."
+  echo -e ""
+  echo -e "$green[eFa]$clean Please make this password long, strong and"
+  echo -e "$green[eFa]$clean different from the web user password."
+  echo -e -n "$green[eFa]$clean Password: "
+  read -s efaclipwd
+  echo -e ""
+  echo -e -n "$green[eFa]$clean Password Again: "
+  read -s efaclipwd2
+  efaclipwdcheck=1
+  while [ $efaclipwdcheck != 0 ]
+   do
+    if [[ "$efauserpwd" == "$efaclipwd" ]]; then
+        echo -e ""
+        echo -e "       $red ERROR: This password cannot be reused for the cli"
+        echo -e "        ERROR: Please try again$clean"
+        echo -e "$green[eFa]$clean Please enter the password for the cli user."
+        echo -e -n "$green[eFa]$clean Password: "
+        read -s efaclipwd
+        echo -e ""
+        echo -e -n "$green[eFa]$clean Password Again: "
+        read -s efaclipwd2
+    elif [[ $efaclipwd == "$efaclipwd2" ]]; then
+        efaclipwdcheck=0
+    else
+        echo -e ""
+        echo -e "       $red ERROR: The passwords do not seem to match"
+        echo -e "        ERROR: Please try again$clean"
+        echo -e "$green[eFa]$clean Please enter the password for the cli user."
+        echo -e -n "$green[eFa]$clean Password: "
+        read -s efaclipwd
+        echo -e ""
+        echo -e -n "$green[eFa]$clean Password Again: "
+        read -s efaclipwd2
+    fi
+  done
+}
+# +---------------------------------------------------+
+
+#+---------------------------------------------------+
+# detect virtual system
+# +---------------------------------------------------+
+function func_detect-virtual() {
+  func_echo-header
+  echo -e "$green[eFa]$clean This will install tools for your hypervisor."
+  echo -e -n  "$green[eFa]$clean Configure virtualization? [Y/n]: "
+  read ASKVIRTUAL
+  if [[ $ASKVIRTUAL =~ ^[Yy]$ || -z $ASKVIRTUAL ]]; then
+    CONFIGVIRTUAL=1
+  else
+    CONFIGVIRTUAL=0
+  fi
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+function func_ask-timezone() {
+  func_echo-header
+  echo -e -n "$green[eFa]$clean Is the host set to UTC time? [Y/n]: "
+  read TMPUTC
+  if [[ "$TMPUTC" == "" || "$TMPUTC" == "Y" || "$TMPUTC" == "y" ]]; then
+    ISUTC=true
+  else
+    ISUTC=false
+  fi
+  echo -e "$green[eFa]$clean Please select the time zone this system is located in."
+  TZONE=`/usr/bin/tzselect`
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+function func_ask-keyboard() {
+  func_echo-header
+  # Todo, build a selector for CentOS
+  KEYBOARD=`localectl | grep Keymap | awk '{print $3}'`
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+function func_ask-mailserver() {
+  func_echo-header
+  echo -e "$green[eFa]$clean Please enter the IP or hostname of your local mail server."
+  echo -e "$green[eFa]$clean This will be your server that actually receives the mail."
+  echo -e "$green[eFa]$clean For example your local Microsoft Exchange or Zimbra server."
+  echo ""
+  echo -e -n "$green[eFa]$clean Your mail server: "
+  read MAILSERVER
+  mailcheck=1
+  while [ $mailcheck != 0 ]
+   do
+     if [[ $MAILSERVER =~ ^[-a-zA-Z0-9\.]{2,256}+$ ]]
+      then
+        mailcheck=0
+     elif checkip $MAILSERVER
+       then
+         mailcheck=0
+     elif checkip6 $MAILSERVER
+       then
+         mailcheck=0
+     else
+        echo -e "       $red ERROR: The hostname $MAILSERVER seems to be invalid"
+        echo -e "        ERROR: please re-enter the mail server$clean"
+        echo -e -n "$green[eFa]$clean : "
+        read MAILSERVER
+     fi
+    done
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+function func_ask-orgname() {
+  func_echo-header
+  echo -e "$green[eFa]$clean Please enter the name of your organization."
+  echo -e "$green[eFa]$clean This needs to be a single word and is used in your mail headers."
+  echo -e "$green[eFa]$clean (No spaces, dots or underscores allowed)."
+  echo ""
+  echo -e -n "$green[eFa]$clean Your organization's name: "
+  read ORGNAME
+  orgnamecheck=1
+  while [ $orgnamecheck != 0 ]
+   do
+     if [[ $ORGNAME =~ ^[a-zA-Z1-9]{2,253}$ ]]
+      then
+        orgnamecheck=0
+      else
+        echo -e "       $red ERROR: The name $ORGNAME seems to be invalid"
+        echo -e "        ERROR: please re-enter the name.$clean"
+        echo -e -n "$green[eFa]$clean Your organization's name: "
+        read ORGNAME
+     fi
+   done
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+function func_ask-ipv6dns() {
+    cipv6dns=1
+    while [ $cipv6dns -ne 0 ]; do
+      func_echo-header
+      echo -e -n "$green[eFa]$clean Enable IPv6 DNS? (Y/n) -> "
+      read askipv6dns
+      if [[ $askipv6dns =~ ^[Yy]$ || -z $askipv6dns ]]; then
+          IPV6DNS=1
+          cipv6dns=0
+      elif [[ $askipv6dns =~ ^[Nn]$ ]]; then
+          IPV6DNS=0
+          cipv6dns=0
+      fi
+    done
+ }
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+# Verify the settings
+# +---------------------------------------------------+
+function func_verify-settings() {
+  verifymenu=1
+  while [ $verifymenu == "1" ]
+   do
+    func_echo-header
+    echo -e "--------------------------------------------------------------"
+    echo -e "$green[eFa]$clean Thank you, the following settings have been gathered:"
+    echo -e " "
+    echo -e "1)  Hostname            : $HOSTNAME"
+    echo -e "2)  Domainname          : $DOMAINNAME"
+    echo -e "3)  Admin Email         : $ADMINEMAIL"
+    echo -e "4)  Interface           : $INTERFACE"
+    echo -e "5)  IP v4 Address       : $IPV4ADDRESS"
+    echo -e "6)  IP v4 Netmask       : $IPV4NETMASK"
+    echo -e "7)  IP v4 Gateway       : $IPV4GATEWAY"
+    echo -e -n "8)  IP v6 DNS           : "; [[ "$IPV6DNS" -eq 1 ]] && echo "Enabled" || echo "Disabled"
+    echo -e "9)  IP v6 Address       : $IPV6ADDRESS"
+    echo -e "10) IP v6 Mask          : $IPV6MASK"
+    echo -e "11) IP v6 Gateway       : $IPV6GATEWAY"
+    echo -e -n "12) Use Recursion       : "; [[ "$enablerecursion" -eq 1 ]] && echo "Enabled" || echo "Disabled"
+    echo -e "13) Primary DNS         : $DNS1"
+    echo -e "14) Secondary DNS       : $DNS2"
+    echo -e "15) Web User            : $USERNAME"
+    echo -e "16) Web User PWD        : <hidden>"
+    echo -e "17) CLI User            : $CLIUSERNAME"
+    echo -e "18) CLI User PWD        : <hidden>"
+    echo -e -n "19) Hypervisor Agents   : "; if [[ "$CONFIGUREVIRTUAL" -eq 1 ]]; then echo "Install"; else echo "No"; fi
+    echo -e -n "20) Time zone           : $TZONE "; if [[ "$ISUTC" == true ]]; then echo " Using UTC "; else echo " Not using UTC"; fi
+    echo -e "21) Keyboard            : $KEYBOARD"
+    echo -e "22) Mail Server         : $MAILSERVER"
+    echo -e "23) Org. name           : $ORGNAME"
+    echo -e "--------------------------------------------------------------"
+    echo -e ""
+    echo -e "$green[eFa]$clean If these settings are correct type 'OK' to continue."
+    echo -e "$green[eFa]$clean if there is an error enter the number you want to change."
+    echo -e -n "$green[eFa]$clean : "
+    local choice
+    read choice
+    case $choice in
+                1)        func_ask-hostname
+                        ;;
+                2)        func_ask-domainname
+                        ;;
+                3)        func_ask-email
+                        ;;
+                4)        func_interfaces
+                        ;;
+                5)        func_ask-ipv4address
+                        ;;
+                6)        func_ask-ipv4netmask
+                        ;;
+                7)        func_ask-ipv4gateway
+                        ;;
+                8)        func_ask-ipv6DNS
+                        ;;
+                9)        func_ask-ipv6address
+                        ;;
+                10)        func_ask-ipv6mask
+                        ;;
+                11)       func_ask-ipv6gateway
+                        ;;
+                12)        func_ask-recursion
+                        ;;
+                13)        func_ask-dns1
+                        ;;
+                14)        func_ask-dns2
+                        ;;
+                15)       func_ask-webusername
+                        ;;
+                16)       func_ask-webuserpassword
+                        ;;
+                17)       func_ask-cliusername
+                        ;;
+                18)       func_ask-clipassword
+                        ;;
+                19)       func_detect-virtual
+                        ;;
+                20)       func_ask-timezone
+                        ;;
+                21)       func_ask-keyboard
+                        ;;
+                22)       func_ask-mailserver
+                        ;;
+                23)       func_ask-orgname
+                        ;;
+                OK)       verifymenu=0
+                        ;;
+                ok)       verifymenu=0
+                        ;;
+    esac
+  done
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+# Function to test IPv4 addresses
+# +---------------------------------------------------+
+function checkip()
+{
+  local  ip=$1
+  local  stat=1
+
+  if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+    OIFS=$IFS
+    IFS='.'
+    ip=($ip)
+    IFS=$OIFS
+    [[ ${ip[0]} -le 255 && ${ip[1]} -le 255 && ${ip[2]} -le 255 && ${ip[3]} -le 255 ]]
+    stat=$?
+  fi
+  return $stat
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+# Function to test IPv6 addresses
+# +---------------------------------------------------+
+function checkip6()
+{
+  local  ip=$1
+
+  if [[ $ip =~ ^([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])$ ]]; then
+    return 0
+  fi
+  return 1
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+# Function to determine the available interfaces.
+# +---------------------------------------------------+
+func_interfaces(){
+  interf=$(ip link show | grep ^[0-9] | awk -F': ' '{print $2}' | sed -e '/^lo/d' -e 's/@.*$//g' | sort | uniq)
+  nrintf=$(echo $interf | wc -w)
+
+  if [ $nrintf -gt 1 ]
+    then
+      echo -e "$green[eFa]$clean You seem to have multiple network interfaces"
+      echo -e "$green[eFa]$clean The interface names on your machine are:"
+      for int in $interf
+        do
+              echo " - $int"
+      done
+
+      local choice
+      echo -e "$green[eFa]$clean Enter the primary interface name"
+      echo -e -n "$green[eFa]$clean : "
+      read choice
+      choice_check=0
+
+      for int in $interf
+        do
+          if [ $int == $choice ]
+            then
+              choice_check=1
+          fi
+        done
+
+      # Check if the user typed a interface that exists.
+      if [ $choice_check -eq 0 ]
+        then
+          echo -e "$green[eFa]$clean ERROR, That interface does not exist."
+          echo -e "$green[eFa]$clean Staring over."
+          sleep 2
+          func_interfaces
+          return
+      fi
+
+      if [ $choice_check -eq 1 ]
+        then
+          echo -e "$green[eFa]$clean Thank you, using $choice as the primary interface"
+          INTERFACE=$choice
+      fi
+  else
+    echo -e "$green[eFa]$clean Your interface seems to be '$interf', using $interf as primary interface"
+    INTERFACE=$interf
+fi
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+# Trap CTRL+C, CTRL+Z and quit singles
+# +---------------------------------------------------+
+if [ $debug == "0" ]; then
+    trap '' SIGINT SIGQUIT SIGTSTP
+fi
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+# Pause
+# +---------------------------------------------------+
+pause(){
+    echo -e "$green[eFa]$clean Press [Enter] key to continue..."
+    read fackEnterKey
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+# The header above all menu's
+# +---------------------------------------------------+
+func_echo-header(){
+    clear
+    echo -e "--------------------------------------------------------------"
+    echo -e "---        Welcome to the eFa Initial Configuration        ---"
+    echo -e "---               https://www.efa-project.org              ---"
+    echo -e "--------------------------------------------------------------"
+    echo ""
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+# Configure system
+# +---------------------------------------------------+
+function func_configure-system() {
+
+  efauserpwd=$(htpasswd -nbBC 10 "" "$efauserpwd" | tr -d ':\n')
+  efaclipwd=$(python3 -c "import crypt; print(crypt.crypt('$efaclipwd', crypt.mksalt(crypt.METHOD_SHA512)))")
+  
+  /usr/sbin/eFa-Commit --commitall --verbose --hostname=$HOSTNAME --domainname=$DOMAINNAME \
+      --ipv4address=$IPV4ADDRESS --ipv6address=$IPV6ADDRESS --dnsip1=$DNS1 --dnsip2=$DNS2 \
+      --enablerecursion=$enablerecursion --interface=$INTERFACE --ipv4netmask=$IPV4NETMASK \
+      --ipv4gateway=$IPV4GATEWAY --ipv6mask=$IPV6MASK --ipv6gateway=$IPV6GATEWAY --timezone=$TZONE \
+      --orgname=$ORGNAME --mailserver=$MAILSERVER --adminemail=$ADMINEMAIL \
+      --efauserpwd="$efauserpwd" --username=$USERNAME --cliusername=$CLIUSERNAME --efaclipwd="$efaclipwd" \
+      --configvirtual=$CONFIGVIRTUAL --isutc=$ISUTC --ipv6dns=$IPV6DNS
+
+  if [[ $? -ne 0 ]]; then
+    echo -e "$red[eFa]$clean - Error initializing system!  Please try again..."
+    exit 1
+  fi
+
+  echo "Configuration complete, preparing to reboot in 60 seconds."
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+# Where to start
+# +---------------------------------------------------+
+clear
+red='\E[00;31m'
+green='\E[00;32m'
+yellow='\E[00;33m'
+blue='\E[00;34m'
+magenta='\E[00;35'
+cyan='\E[00;36m'
+clean='\e[00m'
+
+func_echo-header
+CONFIGURED="`grep CONFIGURED /etc/eFa/eFa-Config | sed 's/^.*://'`"
+if [ $CONFIGURED == "NO" ]
+ then
+    echo -e "--------------------------------------------------------------"
+    echo -e "$green[eFa]$clean We will ask you a few questions to setup this system."
+    echo -e "$green[eFa]$clean Please make sure the system is connected to the internet."
+    echo -e "--------------------------------------------------------------"
+  echo -e -n "$green[eFa]$clean Start eFa first-time configure (Y/n) -> "
+  read StartConf
+
+  if [[ "$StartConf" == "Y" || "$StartConf" == "y" || "$StartConf" == "" ]]; then
+      pause
+      func_ask-keyboard
+      func_ask-hostname
+      func_ask-domainname
+      func_ask-email
+      func_interfaces
+
+      checkipv4=1
+      while [ $checkipv4 -ne 0 ]; do
+        func_echo-header
+        echo -e -n "$green[eFa]$clean Configure IPv4? (Y/n) -> "
+        read askipv4
+        if [[ $askipv4 =~ ^[Yy]$ || -z $askipv4 ]]; then
+            func_ask-ipv4address
+            func_ask-ipv4netmask
+            func_ask-ipv4gateway
+            checkipv4=0
+        elif [[ $askipv4 =~ ^[Nn]$ ]]; then
+            checkipv4=0
+        fi
+      done
+      
+      
+
+      func_ask-ipv6dns
+
+      checkipv6=1
+      while [ $checkipv6 -ne 0 ]; do
+        func_echo-header
+        echo -e -n "$green[eFa]$clean Configure IPv6? (Y/n) -> "
+        read askipv6
+        if [[ $askipv6 =~ ^[Yy]$ || -z $askipv6 ]]; then
+            func_ask-ipv6address
+            func_ask-ipv6mask
+            func_ask-ipv6gateway
+            checkipv6=0
+        elif [[ $askipv6 =~ ^[Nn]$ ]]; then
+            checkipv6=0
+        fi
+      done
+
+      func_ask-recursion
+      func_ask-webusername
+      func_ask-webuserpassword
+      func_ask-cliusername
+      func_ask-clipassword
+      func_detect-virtual
+      func_ask-timezone
+      func_ask-mailserver
+      func_ask-orgname
+      func_verify-settings
+      func_configure-system
+  else
+    echo -e "$red"
+    echo -e "You are now aborting eFa-Init, your system will not function properly."
+    echo -e "Please run /usr/sbin/eFa-Init to start the first-time configuration again."
+    echo -e ""
+    echo -e "Aborting eFa-Init now. $clean"
+    exit 0
+  fi
+else
+    echo -e "$red         ERROR: eFa is already configured $clean"
+    echo -e "$red         Please use eFa-Configure $clean"
+    echo -e ""
+    exit 0
+fi
+# EOF

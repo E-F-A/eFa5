@@ -1,0 +1,32 @@
+commit 9c7bcf991e2dd69d517be84d9594411c47e04562
+Author: Tomas Korbar <tkorbar@redhat.com>
+Date:   Fri May 5 12:48:21 2023 +0200
+
+    Fix build with kernel 6
+
+diff --git a/makedefs b/makedefs
+index aea15d6..ad93a5f 100644
+--- a/makedefs
++++ b/makedefs
+@@ -557,7 +557,7 @@ EOF
+ 		: ${SHLIB_ENV="LD_LIBRARY_PATH=`pwd`/lib"}
+ 		: ${PLUGIN_LD="${CC-gcc} -shared"}
+ 		;;
+- Linux.[345].*)	SYSTYPE=LINUX$RELEASE_MAJOR
++ Linux.[3456].*)	SYSTYPE=LINUX$RELEASE_MAJOR
+ 		case "$CCARGS" in
+ 		 *-DNO_DB*) ;;
+ 		 *-DHAS_DB*) ;;
+diff --git a/src/util/sys_defs.h b/src/util/sys_defs.h
+index f3a3b26..e9d3546 100644
+--- a/src/util/sys_defs.h
++++ b/src/util/sys_defs.h
+@@ -749,7 +749,7 @@ extern int initgroups(const char *, int);
+  /*
+   * LINUX.
+   */
+-#if defined(LINUX2) || defined(LINUX3) || defined(LINUX4) || defined(LINUX5)
++#if defined(LINUX2) || defined(LINUX3) || defined(LINUX4) || defined(LINUX5) || defined(LINUX6)
+ #define SUPPORTED
+ #define UINT32_TYPE	unsigned int
+ #define UINT16_TYPE	unsigned short

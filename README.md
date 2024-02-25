@@ -6,7 +6,7 @@
 eFa stands for Email Filter Appliance.
 eFa is born out of a need for a cost-effective email virus & spam scanning solution.
 
-eFa V5 is a rebuild based on debian.
+eFa V5 is a rebuild of eFa V4 on CentOS 9 Stream.
 
 For more information go to https://efa-project.org
 

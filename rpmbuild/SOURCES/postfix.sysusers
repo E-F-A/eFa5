@@ -1,0 +1,4 @@
+u postfix 89 - /var/spool/postfix /sbin/nologin
+g postdrop 90
+g mail 12
+m postfix mail

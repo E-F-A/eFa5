@@ -1,0 +1,1586 @@
+commit 3a64b35100aa150ce80957dc56f0db7fbdb07017
+Author: Tomas Korbar <tkorbar@redhat.com>
+Date:   Wed May 17 10:01:21 2023 +0200
+
+    Backport SRV record resolution feature
+
+diff --git a/mantools/postlink b/mantools/postlink
+index 490d028..a093c0a 100755
+--- a/mantools/postlink
++++ b/mantools/postlink
+@@ -1129,6 +1129,10 @@ while (<>) {
+     s;\bpostlog_service_name\b;<a href="postconf.5.html#postlog_service_name">$&</a>;g;
+     s;\bpostlogd_watchdog_timeout\b;<a href="postconf.5.html#postlogd_watchdog_timeout">$&</a>;g;
+ 
++    s;\buse_srv_lookup\b;<a href="postconf.5.html#use_srv_lookup">$&</a>;g;
++    s;\ballow_srv_lookup_fallback\b;<a href="postconf.5.html#allow_srv_lookup_fallback">$&</a>;g;
++    s;\bignore_srv_lookup_error\b;<a href="postconf.5.html#ignore_srv_lookup_error">$&</a>;g;
++
+     # Service-defined parameters...
+ 
+     s;\bpolicy_time_limit\b;<a href="postconf.5.html#transport_time_limit">$&</a>;g;
+diff --git a/proto/postconf.proto b/proto/postconf.proto
+index 89f9e9b..ca8899f 100644
+--- a/proto/postconf.proto
++++ b/proto/postconf.proto
+@@ -17760,3 +17760,111 @@ value to disable the feature. </p>
+ 
+ <p> This feature was backported from Postfix 3.6 to Postfix versions
+ 3.5.9, 3.4.19, 3.3.16. 3.2.21. </p>
++
++%PARAM use_srv_lookup
++
++<p> Enables discovery for the specified service(s) using DNS SRV
++records. For example, with "use_srv_lookup = submission" and
++"relayhost = example.com:submission", the Postfix SMTP client will
++look up DNS SRV records for _submission._tcp.example.com, and will
++relay email through the hosts and ports that are specified with
++those records. See RFC 2782 for details of the host selection
++process. </p>
++
++<p> Specify zero or more service names separated by comma and/or
++whitespace. Any name in the services(5) database may be specified,
++though in practice only submission, submissions, and smtp make
++sense.  </p>
++
++<p> When SRV record lookup is enabled with use_srv_lookup, you can
++enclose a domain name in "[]" to force IP address lookup instead
++of SRV record lookup. </p>
++
++<p> Example 1: MUA-to-MTA submission using SRV record lookup for
++the "submission" service for domain "example.com". This uses the
++default SMTP delivery agent with STARTTLS, and looks up SRV records
++for "_submission._tcp.example.com". </p>
++
++<pre>
++/etc/postfix/main.cf:
++    use_srv_lookup = submission
++    relayhost = example.com:submission
++    smtp_tls_security_level = may
++    ...see SASL_README for sasl configuration...
++</pre>
++
++<p> Example 2: MUA-to-MTA submission using SRV record lookup for
++the "submissions" service for domain "example.org". This uses a
++dedicated SMTP delivery agent (smtp-wraptls) with tls_wrappermode
++turned on, and looks up SRV records for "_submissions._tcp.example.org".
++</p>
++
++<p> Note: specify the older name "smtps" instead of "submissions"
++when a provider has DNS SRV records like "_smtps._tcp.example.org"
++instead of "_submissions._tcp.example.org". </p>
++
++<pre>
++/etc/postfix/main.cf:
++    use_srv_lookup = submissions
++    default_transport = smtp-wraptls:example.org:submissions
++    ...see SASL_README for sasl configuration...
++</pre>
++
++<pre>
++/etc/postfix/master.cf:
++    smtp-wraptls   unix   ...   ...   ...   ...   ...   smtp
++        -o { smtp_tls_wrappermode = yes }
++        -o { smtp_tls_security_level = encrypt }
++</pre>
++
++<p> Example 3: Sender-dependent selection for a combination of
++MUA-to-MTA submission services. This combines examples 1 and 2 with
++examples of how to disable SRV and look up IP address records for
++"smtp-relay.example.net" and "smtp-relay.other.example".  Again,
++specify the older name "smtps" instead of "submissions" when a
++provider has DNS SRV records like "_smtps._tcp.example.org" instead
++of "_submissions._tcp.example.org". </p>
++
++<pre>
++/etc/postfix/main.cf:
++    use_srv_lookup = submission, submissions
++    sender_dependent_default_transport_maps = inline:{
++        # Destinations that support SRV record lookup.
++        { user1@example.com = smtp:example.com:submission }
++        { user2@example.org = smtp-wraptls:example.org:submissions }
++        # Use [destination] to force IP address lookups.
++        { user3@example.net = smtp:[smtp-relay.example.net]:submission }
++        { user4@other.example =
++              smtp-wraptls:[smtp-relay.other.example]:submissions } }
++    ...see SASL_README for sasl configuration...
++</pre>
++
++<p> Example 4: MTA-to-MTA traffic, using SRV record lookup for the
++SMTP service. This is useful for Postfix tests, and may be useful
++in environments where ports are dynamically assigned to servers.
++</p>
++
++<pre>
++/etc/postfix/main.cf:
++    use_srv_lookup = smtp
++    # Fall back to MX record lookup when SRV records are unavailable.
++    #allow_srv_lookup_fallback = yes
++    #ignore_srv_lookup_error = yes
++</pre>
++
++<p> This feature was backported from Postfix 3.8. </p>
++
++%PARAM ignore_srv_lookup_error no
++
++<p> When SRV record lookup fails, fall back to MX or IP address
++lookup as if SRV record lookup was not enabled. </p>
++
++<p> This feature was backported from Postfix 3.8. </p>
++
++%PARAM allow_srv_lookup_fallback no
++
++<p> When SRV record lookup fails or no SRV record exists, fall back
++to MX or IP address lookup as if SRV record lookup was not enabled. <p>
++
++<p> This feature was backported from Postfix 3.8. </p>
++
+diff --git a/src/dns/dns.h b/src/dns/dns.h
+index 3631d23..2af1ee2 100644
+--- a/src/dns/dns.h
++++ b/src/dns/dns.h
+@@ -147,10 +147,12 @@ typedef struct DNS_RR {
+     unsigned short class;		/* C_IN, etc. */
+     unsigned int ttl;			/* always */
+     unsigned int dnssec_valid;		/* DNSSEC validated */
+-    unsigned short pref;		/* T_MX only */
++    unsigned short pref;		/* T_MX and T_SRV record related */
++    unsigned short weight;		/* T_SRV related, defined in rfc2782 */
++    unsigned short port;		/* T_SRV related, defined in rfc2782 */
+     struct DNS_RR *next;		/* linkage */
+     size_t  data_len;			/* actual data size */
+-    char    data[1];			/* actually a bunch of data */
++    char    *data;			/* a bunch of data */
+ } DNS_RR;
+ 
+  /*
+@@ -172,14 +174,29 @@ extern char *dns_strrecord(VSTRING *, DNS_RR *);
+  /*
+   * dns_rr.c
+   */
++#define DNS_RR_NOPREF	(0)
++#define DNS_RR_NOWEIGHT	(0)
++#define DNS_RR_NOPORT	(0)
++
++#define dns_rr_create_noport(qname, rname, type, class, ttl, pref, data, \
++				data_len) \
++	dns_rr_create((qname), (rname), (type), (class), (ttl), \
++	(pref), DNS_RR_NOWEIGHT, DNS_RR_NOPORT, (data), (data_len))
++
++#define dns_rr_create_nopref(qname, rname, type, class, ttl, data, data_len) \
++	dns_rr_create_noport((qname), (rname), (type), (class), (ttl), \
++	DNS_RR_NOPREF, (data), (data_len))
++
+ extern DNS_RR *dns_rr_create(const char *, const char *,
+ 			             ushort, ushort,
+ 			             unsigned, unsigned,
++			             unsigned, unsigned,
+ 			             const char *, size_t);
+ extern void dns_rr_free(DNS_RR *);
+ extern DNS_RR *dns_rr_copy(DNS_RR *);
+ extern DNS_RR *dns_rr_append(DNS_RR *, DNS_RR *);
+ extern DNS_RR *dns_rr_sort(DNS_RR *, int (*) (DNS_RR *, DNS_RR *));
++extern DNS_RR *dns_srv_rr_sort(DNS_RR *);
+ extern int dns_rr_compare_pref_ipv6(DNS_RR *, DNS_RR *);
+ extern int dns_rr_compare_pref_ipv4(DNS_RR *, DNS_RR *);
+ extern int dns_rr_compare_pref_any(DNS_RR *, DNS_RR *);
+@@ -283,8 +300,9 @@ extern int dns_lookup_rv(const char *, unsigned, DNS_RR **, VSTRING *,
+   * Below is the precedence order. The order between DNS_RETRY and DNS_NOTFOUND
+   * is arbitrary.
+   */
+-#define DNS_RECURSE	(-7)		/* internal only: recursion needed */
+-#define DNS_NOTFOUND	(-6)		/* query ok, data not found */
++#define DNS_RECURSE	(-8)		/* internal only: recursion needed */
++#define DNS_NOTFOUND	(-7)		/* query ok, data not found */
++#define DNS_NULLSRV	(-6)		/* query ok, service unavailable */
+ #define DNS_NULLMX	(-5)		/* query ok, service unavailable */
+ #define DNS_FAIL	(-4)		/* query failed, don't retry */
+ #define DNS_INVAL	(-3)		/* query ok, malformed reply */
+diff --git a/src/dns/dns_lookup.c b/src/dns/dns_lookup.c
+index 4e3e647..93694d9 100644
+--- a/src/dns/dns_lookup.c
++++ b/src/dns/dns_lookup.c
+@@ -691,6 +691,8 @@ static int dns_get_rr(DNS_RR **list, const char *orig_name, DNS_REPLY *reply,
+     int     comp_len;
+     ssize_t data_len;
+     unsigned pref = 0;
++    unsigned weight = 0;
++    unsigned port = 0;
+     unsigned char *src;
+     unsigned char *dst;
+     int     ch;
+@@ -716,6 +718,18 @@ static int dns_get_rr(DNS_RR **list, const char *orig_name, DNS_REPLY *reply,
+ 	    return (DNS_INVAL);
+ 	data_len = strlen(temp) + 1;
+ 	break;
++    case T_SRV:
++	GETSHORT(pref, pos);
++	GETSHORT(weight, pos);
++	GETSHORT(port, pos);
++	if (dn_expand(reply->buf, reply->end, pos, temp, sizeof(temp)) < 0)
++	    return (DNS_RETRY);
++	if (*temp == 0)
++	    return (DNS_NULLSRV);
++	if (!valid_rr_name(temp, "resource data", fixed->type, reply))
++	    return (DNS_INVAL);
++	data_len = strlen(temp) + 1;
++	break;
+     case T_MX:
+ 	GETSHORT(pref, pos);
+ 	if (dn_expand(reply->buf, reply->end, pos, temp, sizeof(temp)) < 0)
+@@ -811,7 +825,7 @@ static int dns_get_rr(DNS_RR **list, const char *orig_name, DNS_REPLY *reply,
+ 	break;
+     }
+     *list = dns_rr_create(orig_name, rr_name, fixed->type, fixed->class,
+-			  fixed->ttl, pref, tempbuf, data_len);
++			  fixed->ttl, pref, weight, port, tempbuf, data_len);
+     return (DNS_OK);
+ }
+ 
+@@ -911,7 +925,7 @@ static int dns_get_answer(const char *orig_name, DNS_REPLY *reply, int type,
+ 		    resource_found++;
+ 		    rr->dnssec_valid = *maybe_secure ? reply->dnssec_ad : 0;
+ 		    *rrlist = dns_rr_append(*rrlist, rr);
+-		} else if (status == DNS_NULLMX) {
++		} else if (status == DNS_NULLMX || status == DNS_NULLSRV) {
+ 		    CORRUPT(status);		/* TODO: use better name */
+ 		} else if (not_found_status != DNS_RETRY)
+ 		    not_found_status = status;
+@@ -1045,6 +1059,12 @@ int     dns_lookup_x(const char *name, unsigned type, unsigned flags,
+ 				name);
+ 	    SET_H_ERRNO(NO_DATA);
+ 	    return (status);
++	case DNS_NULLSRV:
++	    if (why)
++		vstring_sprintf(why, "Domain %s does not support SRV requests",
++				name);
++	    SET_H_ERRNO(NO_DATA);
++	    return (status);
+ 	case DNS_OK:
+ 	    if (rrlist && dns_rr_filter_maps) {
+ 		if (dns_rr_filter_execute(rrlist) < 0) {
+diff --git a/src/dns/dns_rr.c b/src/dns/dns_rr.c
+index b550788..15b5dee 100644
+--- a/src/dns/dns_rr.c
++++ b/src/dns/dns_rr.c
+@@ -7,13 +7,15 @@
+ /*	#include <dns.h>
+ /*
+ /*	DNS_RR	*dns_rr_create(qname, rname, type, class, ttl, preference,
+-/*				data, data_len)
++/*				weight, port, data, data_len)
+ /*	const char *qname;
+ /*	const char *rname;
+ /*	unsigned short type;
+ /*	unsigned short class;
+ /*	unsigned int ttl;
+ /*	unsigned preference;
++/*	unsigned weight;
++/*	unsigned port;
+ /*	const char *data;
+ /*	size_t data_len;
+ /*
+@@ -49,6 +51,30 @@
+ /*	DNS_RR	*dns_rr_remove(list, record)
+ /*	DNS_RR	*list;
+ /*	DNS_RR	*record;
++/*
++/*	DNS_RR	*dns_srv_rr_sort(list)
++/*	DNS_RR	*list;
++/* AUXILIARY FUNCTIONS
++/*	DNS_RR	*dns_rr_create_nopref(qname, rname, type, class, ttl,
++/*					data, data_len)
++/*	const char *qname;
++/*	const char *rname;
++/*	unsigned short type;
++/*	unsigned short class;
++/*	unsigned int ttl;
++/*	const char *data;
++/*	size_t data_len;
++/*
++/*	DNS_RR	*dns_rr_create_noport(qname, rname, type, class, ttl,
++/*					preference, data, data_len)
++/*	const char *qname;
++/*	const char *rname;
++/*	unsigned short type;
++/*	unsigned short class;
++/*	unsigned int ttl;
++/*	unsigned preference;
++/*	const char *data;
++/*	size_t data_len;
+ /* DESCRIPTION
+ /*	The routines in this module maintain memory for DNS resource record
+ /*	information, and maintain lists of DNS resource records.
+@@ -56,10 +82,14 @@
+ /*	dns_rr_create() creates and initializes one resource record.
+ /*	The \fIqname\fR field specifies the query name.
+ /*	The \fIrname\fR field specifies the reply name.
+-/*	\fIpreference\fR is used for MX records; \fIdata\fR is a null
++/*	\fIpreference\fR is used for MX and SRV records; \fIweight\fR
++/*	and \fIport\fR are used for SRV records; \fIdata\fR is a null
+ /*	pointer or specifies optional resource-specific data;
+ /*	\fIdata_len\fR is the amount of resource-specific data.
+ /*
++/*	dns_rr_create_nopref() and dns_rr_create_noport() are convenience
++/*	wrappers around dns_rr_create() that take fewer arguments.
++/*
+ /*	dns_rr_free() releases the resource used by of zero or more
+ /*	resource records.
+ /*
+@@ -81,6 +111,9 @@
+ /*	dns_rr_remove() removes the specified record from the specified list.
+ /*	The updated list is the result value.
+ /*	The record MUST be a list member.
++/*
++/*	dns_srv_rr_sort() sorts a list of SRV records according to
++/*	their priority and weight as described in RFC 2782.
+ /* LICENSE
+ /* .ad
+ /* .fi
+@@ -113,11 +146,15 @@
+ DNS_RR *dns_rr_create(const char *qname, const char *rname,
+ 		              ushort type, ushort class,
+ 		              unsigned int ttl, unsigned pref,
++		              unsigned weight, unsigned port,
+ 		              const char *data, size_t data_len)
+ {
+     DNS_RR *rr;
+ 
+-    rr = (DNS_RR *) mymalloc(sizeof(*rr) + data_len - 1);
++    /*
++     * Note: if this function is changed, update dns_rr_copy().
++     */
++    rr = (DNS_RR *) mymalloc(sizeof(*rr));
+     rr->qname = mystrdup(qname);
+     rr->rname = mystrdup(rname);
+     rr->type = type;
+@@ -125,8 +162,14 @@ DNS_RR *dns_rr_create(const char *qname, const char *rname,
+     rr->ttl = ttl;
+     rr->dnssec_valid = 0;
+     rr->pref = pref;
+-    if (data && data_len > 0)
++    rr->weight = weight;
++    rr->port = port;
++    if (data_len != 0) {
++	rr->data = mymalloc(data_len);
+ 	memcpy(rr->data, data, data_len);
++    } else {
++	rr->data = 0;
++    }
+     rr->data_len = data_len;
+     rr->next = 0;
+     return (rr);
+@@ -141,6 +184,8 @@ void    dns_rr_free(DNS_RR *rr)
+ 	    dns_rr_free(rr->next);
+ 	myfree(rr->qname);
+ 	myfree(rr->rname);
++	if (rr->data)
++	    myfree(rr->data);
+ 	myfree((void *) rr);
+     }
+ }
+@@ -149,16 +194,17 @@ void    dns_rr_free(DNS_RR *rr)
+ 
+ DNS_RR *dns_rr_copy(DNS_RR *src)
+ {
+-    ssize_t len = sizeof(*src) + src->data_len - 1;
+     DNS_RR *dst;
+ 
+     /*
+-     * Combine struct assignment and data copy in one block copy operation.
++     * Note: struct copy, because dns_rr_create() would not copy all fields.
+      */
+-    dst = (DNS_RR *) mymalloc(len);
+-    memcpy((void *) dst, (void *) src, len);
++    dst = (DNS_RR *) mymalloc(sizeof(*dst));
++    *dst = *src;
+     dst->qname = mystrdup(src->qname);
+     dst->rname = mystrdup(src->rname);
++    if (dst->data)
++	dst->data = mymemdup(src->data, src->data_len);
+     dst->next = 0;
+     return (dst);
+ }
+@@ -247,6 +293,12 @@ DNS_RR *dns_rr_sort(DNS_RR *list, int (*compar) (DNS_RR *, DNS_RR *))
+     int     len;
+     int     i;
+ 
++    /*
++     * Avoid mymalloc() panic.
++     */
++    if (list == 0)
++	return (list);
++
+     /*
+      * Save state and initialize.
+      */
+@@ -293,6 +345,12 @@ DNS_RR *dns_rr_shuffle(DNS_RR *list)
+     int     i;
+     int     r;
+ 
++    /*
++     * Avoid mymalloc() panic.
++     */
++    if (list == 0)
++	return (list);
++
+     /*
+      * Build linear array with pointers to each list element.
+      */
+@@ -345,3 +403,141 @@ DNS_RR *dns_rr_remove(DNS_RR *list, DNS_RR *record)
+     }
+     return (list);
+ }
++
++/* weight_order - sort equal-priority records by weight */
++
++static void weight_order(DNS_RR **array, int count)
++{
++    int     unordered_weights;
++    int     i;
++
++    /*
++     * Compute the sum of record weights. If weights are not supplied then
++     * this function would be a noop. In fact this would be a noop when all
++     * weights have the same value, whether that weight is zero or not. There
++     * is no need to give special treatment to zero weights.
++     */
++    for (unordered_weights = 0, i = 0; i < count; i++)
++	unordered_weights += array[i]->weight;
++    if (unordered_weights == 0)
++	return;
++
++    /*
++     * The record ordering code below differs from RFC 2782 when the input
++     * contains a mix of zero and non-zero weights: the code below does not
++     * give special treatment to zero weights. Instead, it treats a zero
++     * weight just like any other small weight. Fewer special cases make for
++     * code that is simpler and more robust.
++     */
++    for (i = 0; i < count - 1; i++) {
++	int     running_sum;
++	int     threshold;
++	int     k;
++	DNS_RR *temp;
++
++	/*
++	 * Choose a random threshold [0..unordered_weights] inclusive.
++	 */
++	threshold = myrand() % (unordered_weights + 1);
++
++	/*
++	 * Move the first record with running_sum >= threshold to the ordered
++	 * list, and update unordered_weights.
++	 */
++	for (running_sum = 0, k = i; k < count; k++) {
++	    running_sum += array[k]->weight;
++	    if (running_sum >= threshold) {
++		unordered_weights -= array[k]->weight;
++		temp = array[i];
++		array[i] = array[k];
++		array[k] = temp;
++		break;
++	    }
++	}
++    }
++}
++
++/* dns_srv_rr_sort - sort resource record list */
++
++DNS_RR *dns_srv_rr_sort(DNS_RR *list)
++{
++    int     (*saved_user) (DNS_RR *, DNS_RR *);
++    DNS_RR **rr_array;
++    DNS_RR *rr;
++    int     len;
++    int     i;
++    int     r;
++    int     cur_pref;
++    int     left_bound;			/* inclusive */
++    int     right_bound;		/* non-inclusive */
++
++    /*
++     * Avoid mymalloc() panic, or rr_array[0] fence-post error.
++     */
++    if (list == 0)
++	return (list);
++
++    /*
++     * Save state and initialize.
++     */
++    saved_user = dns_rr_sort_user;
++    dns_rr_sort_user = dns_rr_compare_pref_any;
++
++    /*
++     * Build linear array with pointers to each list element.
++     */
++    for (len = 0, rr = list; rr != 0; len++, rr = rr->next)
++	 /* void */ ;
++    rr_array = (DNS_RR **) mymalloc(len * sizeof(*rr_array));
++    for (len = 0, rr = list; rr != 0; len++, rr = rr->next)
++	rr_array[len] = rr;
++
++    /*
++     * Shuffle resource records. Every element has an equal chance of landing
++     * in slot 0.  After that every remaining element has an equal chance of
++     * landing in slot 1, ...  This is exactly n! states for n! permutations.
++     */
++    for (i = 0; i < len - 1; i++) {
++	r = i + (myrand() % (len - i));		/* Victor&Son */
++	rr = rr_array[i];
++	rr_array[i] = rr_array[r];
++	rr_array[r] = rr;
++    }
++
++    /* First order the records by preference. */
++    qsort((void *) rr_array, len, sizeof(*rr_array), dns_rr_sort_callback);
++
++    /*
++     * Walk through records and sort the records in every same-preference
++     * partition according to their weight. Note that left_bound is
++     * inclusive, and that right-bound is non-inclusive.
++     */
++    left_bound = 0;
++    cur_pref = rr_array[left_bound]->pref;	/* assumes len > 0 */
++
++    for (right_bound = 1; /* see below */ ; right_bound++) {
++	if (right_bound == len || rr_array[right_bound]->pref != cur_pref) {
++	    if (right_bound - left_bound > 1)
++		weight_order(rr_array + left_bound, right_bound - left_bound);
++	    if (right_bound == len)
++		break;
++	    left_bound = right_bound;
++	    cur_pref = rr_array[left_bound]->pref;
++	}
++    }
++
++    /*
++     * Fix the links.
++     */
++    for (i = 0; i < len - 1; i++)
++	rr_array[i]->next = rr_array[i + 1];
++    rr_array[i]->next = 0;
++    list = rr_array[0];
++
++    /*
++     * Cleanup.
++     */
++    myfree((void *) rr_array);
++    dns_rr_sort_user = saved_user;
++    return (list);
++}
+diff --git a/src/dns/dns_sa_to_rr.c b/src/dns/dns_sa_to_rr.c
+index 6b9efcc..b5dee20 100644
+--- a/src/dns/dns_sa_to_rr.c
++++ b/src/dns/dns_sa_to_rr.c
+@@ -55,14 +55,14 @@ DNS_RR *dns_sa_to_rr(const char *hostname, unsigned pref, struct sockaddr *sa)
+ #define DUMMY_TTL	0
+ 
+     if (sa->sa_family == AF_INET) {
+-	return (dns_rr_create(hostname, hostname, T_A, C_IN, DUMMY_TTL, pref,
+-			      (char *) &SOCK_ADDR_IN_ADDR(sa),
+-			      sizeof(SOCK_ADDR_IN_ADDR(sa))));
++	return (dns_rr_create_noport(hostname, hostname, T_A, C_IN, DUMMY_TTL,
++				     pref, (char *) &SOCK_ADDR_IN_ADDR(sa),
++				     sizeof(SOCK_ADDR_IN_ADDR(sa))));
+ #ifdef HAS_IPV6
+     } else if (sa->sa_family == AF_INET6) {
+-	return (dns_rr_create(hostname, hostname, T_AAAA, C_IN, DUMMY_TTL, pref,
+-			      (char *) &SOCK_ADDR_IN6_ADDR(sa),
+-			      sizeof(SOCK_ADDR_IN6_ADDR(sa))));
++	return (dns_rr_create_noport(hostname, hostname, T_AAAA, C_IN, DUMMY_TTL,
++				     pref, (char *) &SOCK_ADDR_IN6_ADDR(sa),
++				     sizeof(SOCK_ADDR_IN6_ADDR(sa))));
+ #endif
+     } else {
+ 	errno = EAFNOSUPPORT;
+@@ -121,7 +121,7 @@ int     main(int argc, char **argv)
+ 	    resv[len++] = res;
+ 	qsort((void *) resv, len, sizeof(*resv), compare_family);
+ 	for (n = 0; n < len; n++) {
+-	    if ((rr = dns_sa_to_rr(argv[0], 0, resv[n]->ai_addr)) == 0)
++	    if ((rr = dns_sa_to_rr(argv[0], DNS_RR_NOPREF, resv[n]->ai_addr)) == 0)
+ 		msg_fatal("dns_sa_to_rr: %m");
+ 	    if (dns_rr_to_pa(rr, &hostaddr) == 0)
+ 		msg_fatal("dns_rr_to_pa: %m");
+diff --git a/src/dns/dns_strrecord.c b/src/dns/dns_strrecord.c
+index 6b8e989..1e3b743 100644
+--- a/src/dns/dns_strrecord.c
++++ b/src/dns/dns_strrecord.c
+@@ -80,6 +80,10 @@ char   *dns_strrecord(VSTRING *buf, DNS_RR *rr)
+     case T_MX:
+ 	vstring_sprintf_append(buf, "%u %s.", rr->pref, rr->data);
+ 	break;
++    case T_SRV:
++	vstring_sprintf_append(buf, "%u %u %u %s.", rr->pref, rr->weight,
++			       rr->port, rr->data);
++	break;
+     case T_TLSA:
+ 	if (rr->data_len >= 3) {
+ 	    uint8_t *ip = (uint8_t *) rr->data;
+diff --git a/src/dns/dns_strtype.c b/src/dns/dns_strtype.c
+index 70e59ac..7eebe3c 100644
+--- a/src/dns/dns_strtype.c
++++ b/src/dns/dns_strtype.c
+@@ -180,6 +180,9 @@ static struct dns_type_map dns_type_map[] = {
+ #ifdef T_ANY
+     T_ANY, "ANY",
+ #endif
++#ifdef T_SRV
++    T_SRV, "SRV",
++#endif
+ };
+ 
+ /* dns_strtype - translate DNS query type to string */
+diff --git a/src/global/mail_params.h b/src/global/mail_params.h
+index 27b17d5..e8d9c28 100644
+--- a/src/global/mail_params.h
++++ b/src/global/mail_params.h
+@@ -4209,6 +4209,21 @@ extern char *var_info_log_addr_form;
+ #define DEF_DNSSEC_PROBE	"ns:."
+ extern char *var_dnssec_probe;
+ 
++ /*
++  * SRV lookup support.
++  */
++#define VAR_USE_SRV_LOOKUP	"use_srv_lookup"
++#define DEF_USE_SRV_LOOKUP	""
++extern char *var_use_srv_lookup;
++
++#define VAR_IGN_SRV_LOOKUP_ERR	"ignore_srv_lookup_error"
++#define DEF_IGN_SRV_LOOKUP_ERR	0
++extern bool var_ign_srv_lookup_err;
++
++#define VAR_ALLOW_SRV_FALLBACK	"allow_srv_lookup_fallback"
++#define DEF_ALLOW_SRV_FALLBACK	0
++extern bool var_allow_srv_fallback;
++
+ /* LICENSE
+ /* .ad
+ /* .fi
+diff --git a/src/posttls-finger/posttls-finger.c b/src/posttls-finger/posttls-finger.c
+index a3a9946..60bf047 100644
+--- a/src/posttls-finger/posttls-finger.c
++++ b/src/posttls-finger/posttls-finger.c
+@@ -236,6 +236,8 @@
+ /*	is encountered, up to 5 times or as specified with the \fB-m\fR option.
+ /*	By default reconnection is disabled, specify a positive delay to
+ /*	enable this behavior.
++/* .IP "\fB-R\fR"
++/*	Use SRV lookup instead of MX.
+ /* .IP "\fB-s \fIservername\fR"
+ /*	The server name to send with the TLS Server Name Indication (SNI)
+ /*	extension.  When the server has DANE TLSA records, this parameter
+@@ -466,6 +468,7 @@ typedef struct STATE {
+     DNS_RR *mx;				/* MX RRset qname, rname, valid */
+     int     pass;			/* Pass number, 2 for reconnect */
+     int     nochat;			/* disable chat logging */
++    int     dosrv;			/* look up SRV records instead of MX */
+     char   *helo;			/* Server name from EHLO reply */
+     DSN_BUF *why;			/* SMTP-style error message */
+     VSTRING *buffer;			/* Response buffer */
+@@ -1150,7 +1153,7 @@ static VSTREAM *connect_addr(STATE *state, DNS_RR *addr)
+ /* addr_one - address lookup for one host name */
+ 
+ static DNS_RR *addr_one(STATE *state, DNS_RR *addr_list, const char *host,
+-			        int res_opt, unsigned pref)
++			        int res_opt, unsigned pref, unsigned port)
+ {
+     static const char *myname = "addr_one";
+     DSN_BUF *why = state->why;
+@@ -1173,6 +1176,8 @@ static DNS_RR *addr_one(STATE *state, DNS_RR *addr_list, const char *host,
+ 	if ((addr = dns_sa_to_rr(host, pref, res0->ai_addr)) == 0)
+ 	    msg_fatal("host %s: conversion error for address family %d: %m",
+ 		    host, ((struct sockaddr *) (res0->ai_addr))->sa_family);
++	addr->pref = pref;
++	addr->port = port;
+ 	addr_list = dns_rr_append(addr_list, addr);
+ 	freeaddrinfo(res0);
+ 	return (addr_list);
+@@ -1189,8 +1194,10 @@ static DNS_RR *addr_one(STATE *state, DNS_RR *addr_list, const char *host,
+ 			     why->reason, DNS_REQ_FLAG_NONE,
+ 			     proto_info->dns_atype_list)) {
+ 	case DNS_OK:
+-	    for (rr = addr; rr; rr = rr->next)
++	    for (rr = addr; rr; rr = rr->next) {
+ 		rr->pref = pref;
++		rr->port = port;
++	    }
+ 	    addr_list = dns_rr_append(addr_list, addr);
+ 	    return (addr_list);
+ 	default:
+@@ -1277,15 +1284,15 @@ static DNS_RR *mx_addr_list(STATE *state, DNS_RR *mx_names)
+ #endif
+ 
+     for (rr = mx_names; rr; rr = rr->next) {
+-	if (rr->type != T_MX)
++	if (rr->type != T_MX && rr->type != T_SRV)
+ 	    msg_panic("%s: bad resource type: %d", myname, rr->type);
+ 	addr_list = addr_one(state, addr_list, (char *) rr->data, res_opt,
+-			     rr->pref);
++			     rr->pref, rr->port);
+     }
+     return (addr_list);
+ }
+ 
+-/* smtp_domain_addr - mail exchanger address lookup */
++/* domain_addr - mail exchanger address lookup */
+ 
+ static DNS_RR *domain_addr(STATE *state, char *domain)
+ {
+@@ -1350,6 +1357,74 @@ static DNS_RR *domain_addr(STATE *state, char *domain)
+     return (addr_list);
+ }
+ 
++/* service_addr - mail exchanger address lookup */
++
++static DNS_RR *service_addr(STATE *state, const char *domain,
++			            const char *service)
++{
++    VSTRING *srv_qname = vstring_alloc(100);
++    char   *str_srv_qname;
++    DNS_RR *srv_names;
++    DNS_RR *addr_list = 0;
++    int     r = 0;			/* Resolver flags */
++    const char *aname;
++
++    dsb_reset(state->why);
++
++#if (RES_USE_DNSSEC != 0) && (RES_USE_EDNS0 != 0)
++    r |= RES_USE_DNSSEC;
++#endif
++
++    vstring_sprintf(srv_qname, "_%s._tcp.%s", service, domain);
++    str_srv_qname = STR(srv_qname);
++
++    /*
++     * IDNA support.
++     */
++#ifndef NO_EAI
++    if (!allascii(str_srv_qname)
++	&& (aname = midna_domain_to_ascii(str_srv_qname)) != 0) {
++	msg_info("%s asciified to %s", str_srv_qname, aname);
++    } else
++#endif
++	aname = str_srv_qname;
++
++    switch (dns_lookup(aname, T_SRV, r, &srv_names, (VSTRING *) 0,
++		       state->why->reason)) {
++    default:
++	dsb_status(state->why, "4.4.3");
++	break;
++    case DNS_INVAL:
++	dsb_status(state->why, "5.4.4");
++	break;
++    case DNS_NULLMX:
++	dsb_status(state->why, "5.1.0");
++	break;
++    case DNS_FAIL:
++	dsb_status(state->why, "5.4.3");
++	break;
++    case DNS_OK:
++	/* Shuffle then sort the SRV rr records by priority and weight. */
++	srv_names = dns_srv_rr_sort(srv_names);
++	addr_list = mx_addr_list(state, srv_names);
++	state->mx = dns_rr_copy(srv_names);
++	dns_rr_free(srv_names);
++	if (addr_list == 0) {
++	    msg_warn("no SRV host for %s has a valid address record",
++		     str_srv_qname);
++	    break;
++	}
++	/* TODO: sort by priority, weight, and address family preference. */
++	break;
++    case DNS_NOTFOUND:
++	dsb_status(state->why, "5.4.4");
++	break;
++    }
++
++    vstring_free(srv_qname);
++    return (addr_list);
++}
++
+ /* host_addr - direct host lookup */
+ 
+ static DNS_RR *host_addr(STATE *state, const char *host)
+@@ -1376,7 +1451,8 @@ static DNS_RR *host_addr(STATE *state, const char *host)
+ 	ahost = host;
+ 
+ #define PREF0	0
+-    addr_list = addr_one(state, (DNS_RR *) 0, ahost, res_opt, PREF0);
++#define NOPORT	0
++    addr_list = addr_one(state, (DNS_RR *) 0, ahost, res_opt, PREF0, NOPORT);
+     if (addr_list && addr_list->next) {
+ 	addr_list = dns_rr_shuffle(addr_list);
+ 	if (inet_proto_info()->ai_family_list[1] != 0)
+@@ -1465,7 +1541,8 @@ static int dane_host_level(STATE *state, DNS_RR *addr)
+ /* parse_destination - parse host/port destination */
+ 
+ static char *parse_destination(char *destination, char *def_service,
+-			               char **hostp, unsigned *portp)
++			               char **hostp, char **servicep,
++			               unsigned *portp)
+ {
+     char   *buf = mystrdup(destination);
+     char   *service;
+@@ -1481,12 +1558,13 @@ static char *parse_destination(char *destination, char *def_service,
+      * Parse the host/port information. We're working with a copy of the
+      * destination argument so the parsing can be destructive.
+      */
+-    if ((err = host_port(buf, hostp, (char *) 0, &service, def_service)) != 0)
++    if ((err = host_port(buf, hostp, (char *) 0, servicep, def_service)) != 0)
+ 	msg_fatal("%s in server description: %s", err, destination);
+ 
+     /*
+      * Convert service to port number, network byte order.
+      */
++	service = *servicep;
+     if (alldig(service)) {
+ 	if ((port = atoi(service)) >= 65536 || port == 0)
+ 	    msg_fatal("bad network port in destination: %s", destination);
+@@ -1507,17 +1585,21 @@ static char *parse_destination(char *destination, char *def_service,
+ static void connect_remote(STATE *state, char *dest)
+ {
+     DNS_RR *addr;
+-    char   *buf;
+-    char   *domain;
+ 
+     /* When reconnecting use IP address of previous session */
+     if (state->addr == 0) {
++    char   *buf;
++    char   *domain;
++    char   *service;
++
+ 	buf = parse_destination(dest, state->smtp ? "smtp" : "24",
+-				&domain, &state->port);
++				&domain, &service, &state->port);
+ 	if (!state->nexthop)
+ 	    state->nexthop = mystrdup(domain);
+ 	if (state->smtp == 0 || *dest == '[')
+ 	    state->addr = host_addr(state, domain);
++	else if (state->dosrv)
++	    state->addr = service_addr(state, domain, service);
+ 	else
+ 	    state->addr = domain_addr(state, domain);
+ 	myfree(buf);
+@@ -1531,10 +1613,14 @@ static void connect_remote(STATE *state, char *dest)
+     for (addr = state->addr; addr; addr = addr->next) {
+ 	int     level = dane_host_level(state, addr);
+ 
++	if (addr->port)				/* SRV port override */
++	    state->port = htons(addr->port);
++
+ 	if (level == TLS_LEV_INVALID
+ 	    || (state->stream = connect_addr(state, addr)) == 0) {
+-	    msg_info("Failed to establish session to %s via %s: %s",
+-		     dest, HNAME(addr), vstring_str(state->why->reason));
++           msg_info("Failed to establish session to %s via %s:%u: %s",
++                    dest, HNAME(addr), addr->port,
++		     vstring_str(state->why->reason));
+ 	    continue;
+ 	}
+ 	/* We have a connection */
+@@ -1819,6 +1905,7 @@ static void parse_options(STATE *state, int argc, char *argv[])
+ 
+     state->smtp = 1;
+     state->pass = 1;
++    state->dosrv = 0;
+     state->reconnect = -1;
+     state->max_reconnect = 5;
+     state->wrapper_mode = 0;
+@@ -1829,7 +1916,7 @@ static void parse_options(STATE *state, int argc, char *argv[])
+     memset((void *) &state->options, 0, sizeof(state->options));
+     state->options.host_lookup = mystrdup("dns");
+ 
+-#define OPTS "a:ch:o:St:T:v"
++#define OPTS "a:ch:o:RSt:T:v"
+ #ifdef USE_TLS
+ #define TLSOPTS "A:Cd:fF:g:H:k:K:l:L:m:M:p:P:r:s:wX"
+ 
+@@ -1868,6 +1955,9 @@ static void parse_options(STATE *state, int argc, char *argv[])
+ 	case 'o':
+ 	    override(optarg);
+ 	    break;
++	case 'R':
++	    state->dosrv = 1;
++	    break;
+ 	case 'S':
+ 	    state->smtp = 0;
+ 	    break;
+diff --git a/src/smtp/lmtp_params.c b/src/smtp/lmtp_params.c
+index 973cb5d..ff074cd 100644
+--- a/src/smtp/lmtp_params.c
++++ b/src/smtp/lmtp_params.c
+@@ -64,6 +64,7 @@
+ 	VAR_LMTP_DSN_FILTER, DEF_LMTP_DSN_FILTER, &var_smtp_dsn_filter, 0, 0,
+ 	VAR_LMTP_DNS_RE_FILTER, DEF_LMTP_DNS_RE_FILTER, &var_smtp_dns_re_filter, 0, 0,
+ 	VAR_TLSPROXY_SERVICE, DEF_TLSPROXY_SERVICE, &var_tlsproxy_service, 1, 0,
++	VAR_USE_SRV_LOOKUP, DEF_USE_SRV_LOOKUP, &var_use_srv_lookup, 0, 0,
+ 	0,
+     };
+     static const CONFIG_TIME_TABLE lmtp_time_table[] = {
+@@ -126,5 +127,7 @@
+ 	VAR_LMTP_REC_DEADLINE, DEF_LMTP_REC_DEADLINE, &var_smtp_rec_deadline,
+ 	VAR_LMTP_DUMMY_MAIL_AUTH, DEF_LMTP_DUMMY_MAIL_AUTH, &var_smtp_dummy_mail_auth,
+ 	VAR_LMTP_BALANCE_INET_PROTO, DEF_LMTP_BALANCE_INET_PROTO, &var_smtp_balance_inet_proto,
++	VAR_IGN_SRV_LOOKUP_ERR, DEF_IGN_SRV_LOOKUP_ERR, &var_ign_srv_lookup_err,
++	VAR_ALLOW_SRV_FALLBACK, DEF_ALLOW_SRV_FALLBACK, &var_allow_srv_fallback,
+ 	0,
+     };
+diff --git a/src/smtp/smtp.c b/src/smtp/smtp.c
+index e46ebd6..2cc9e2f 100644
+--- a/src/smtp/smtp.c
++++ b/src/smtp/smtp.c
+@@ -146,6 +146,7 @@
+ /*	RFC 2046 (MIME: Media Types)
+ /*	RFC 2554 (AUTH command)
+ /*	RFC 2821 (SMTP protocol)
++/*	RFC 2782 (SRV resource records)
+ /*	RFC 2920 (SMTP Pipelining)
+ /*	RFC 3207 (STARTTLS command)
+ /*	RFC 3461 (SMTP DSN Extension)
+@@ -336,6 +337,17 @@
+ /*	The DNS query type (default: "ns") and DNS query name (default:
+ /*	".") that Postfix may use to determine whether DNSSEC validation
+ /*	is available.
++/* .PP
++/*	Backported from Postfix version 3.8:
++/* .IP "\fBuse_srv_lookup (empty)\fR"
++/*	Enables discovery for the specified service(s) using DNS SRV
++/*	records.
++/* .IP "\fBignore_srv_lookup_error (no)\fR"
++/*	When SRV record lookup fails, fall back to MX or IP address
++/*	lookup as if SRV record lookup was not enabled.
++/* .IP "\fBallow_srv_lookup_fallback (no)\fR"
++/*	When SRV record lookup fails or no SRV record exists, fall back
++/*	to MX or IP address lookup as if SRV record lookup was not enabled.
+ /* MIME PROCESSING CONTROLS
+ /* .ad
+ /* .fi
+@@ -1052,6 +1064,9 @@ bool    var_smtp_dummy_mail_auth;
+ char   *var_smtp_dsn_filter;
+ char   *var_smtp_dns_re_filter;
+ bool    var_smtp_balance_inet_proto;
++char   *var_use_srv_lookup;
++bool	var_ign_srv_lookup_err;
++bool	var_allow_srv_fallback;
+ 
+  /* Special handling of 535 AUTH errors. */
+ char   *var_smtp_sasl_auth_cache_name;
+@@ -1074,6 +1089,7 @@ MAPS   *smtp_pix_bug_maps;
+ HBC_CHECKS *smtp_header_checks;		/* limited header checks */
+ HBC_CHECKS *smtp_body_checks;		/* limited body checks */
+ SMTP_CLI_ATTR smtp_cli_attr;		/* parsed command-line */
++STRING_LIST *smtp_use_srv_lookup;
+ 
+ #ifdef USE_TLS
+ 
+@@ -1357,6 +1373,14 @@ static void post_init(char *unused_name, char **argv)
+      * the process lifetime.
+      */
+     get_cli_attr(&smtp_cli_attr, argv);
++
++    /*
++     * Service discovery with SRV record lookup.
++     */
++    if (*var_use_srv_lookup)
++	smtp_use_srv_lookup = string_list_init(VAR_USE_SRV_LOOKUP,
++					       MATCH_FLAG_RETURN,
++					       var_use_srv_lookup);
+ }
+ 
+ /* pre_init - pre-jail initialization */
+diff --git a/src/smtp/smtp.h b/src/smtp/smtp.h
+index 281cfe4..3f4c209 100644
+--- a/src/smtp/smtp.h
++++ b/src/smtp/smtp.h
+@@ -84,6 +84,14 @@ typedef struct SMTP_ITERATOR {
+ 	vstring_strcpy((iter)->dest, STR((iter)->saved_dest)); \
+     } while (0)
+ 
++#define SMTP_ITER_UPDATE_HOST(iter, _host, _addr, _rr) do { \
++	vstring_strcpy((iter)->host, (_host)); \
++	vstring_strcpy((iter)->addr, (_addr)); \
++	(iter)->rr = (_rr); \
++	if ((_rr)->port) \
++	    (iter)->port = htons((_rr)->port); /* SRV port override */ \
++    } while (0)
++
+  /*
+   * TLS Policy support.
+   */
+@@ -261,6 +269,7 @@ typedef struct SMTP_STATE {
+ #define SMTP_MISC_FLAG_COMPLETE_SESSION	(1<<7)
+ #define SMTP_MISC_FLAG_PREF_IPV6	(1<<8)
+ #define SMTP_MISC_FLAG_PREF_IPV4	(1<<9)
++#define SMTP_MISC_FLAG_FALLBACK_SRV_TO_MX (1<<10)
+ 
+ #define SMTP_MISC_FLAG_CONN_CACHE_MASK \
+ 	(SMTP_MISC_FLAG_CONN_LOAD | SMTP_MISC_FLAG_CONN_STORE)
+@@ -300,6 +309,8 @@ extern MAPS *smtp_generic_maps;		/* make internal address valid */
+ extern int smtp_ext_prop_mask;		/* address externsion propagation */
+ extern unsigned smtp_dns_res_opt;	/* DNS query flags */
+ 
++extern STRING_LIST *smtp_use_srv_lookup;/* services with SRV record lookup */
++
+ #ifdef USE_TLS
+ 
+ extern TLS_APPL_STATE *smtp_tls_ctx;	/* client-side TLS engine */
+diff --git a/src/smtp/smtp_addr.c b/src/smtp/smtp_addr.c
+index 2210ff7..7f20838 100644
+--- a/src/smtp/smtp_addr.c
++++ b/src/smtp/smtp_addr.c
+@@ -17,6 +17,15 @@
+ /*	char	*name;
+ /*	int	misc_flags;
+ /*	DSN_BUF	*why;
++/*
++/*	DNS_RR	*smtp_service_addr(name, service, mxrr, misc_flags, why,
++/*					found_myself)
++/*	const char *name;
++/*	const char *service;
++/*	DNS_RR  **mxrr;
++/*	int	misc_flags;
++/*	DSN_BUF	*why;
++/*	int	*found_myself;
+ /* DESCRIPTION
+ /*	This module implements Internet address lookups. By default,
+ /*	lookups are done via the Internet domain name service (DNS).
+@@ -33,6 +42,8 @@
+ /*	destination.  If MX records were found, the rname, qname,
+ /*	and dnssec validation status of the MX RRset are returned
+ /*	via mxrr, which the caller must free with dns_rr_free().
++/*	Fallback from MX to address lookups is governed by RFC 2821,
++/*	and by local policy (var_ign_mx_lookup_err).
+ /*
+ /*	When no mail exchanger is listed in the DNS for \fIname\fR, the
+ /*	request is passed to smtp_host_addr().
+@@ -44,8 +55,18 @@
+ /*	host.  The host can be specified as a numerical Internet network
+ /*	address, or as a symbolic host name.
+ /*
+-/*	Results from smtp_domain_addr() or smtp_host_addr() are
+-/*	destroyed by dns_rr_free(), including null lists.
++/*	smtp_service_addr() looks up addresses for hosts specified
++/*	in SRV records for the specified domain and service. This
++/*	supports the features of smtp_domain_addr() except that
++/*	the order of SRV records is determined by RFC 2782, and
++/*	that address records are not sorted by IP address family
++/*	preference.  Fallback from SRV to MX or address lookups is
++/*	governed by local policy (var_ign_mx_lookup_err and
++/*	var_allow_srv_fallback).
++/*
++/*	Results from smtp_domain_addr(), smtp_host_addr(), and
++/*	smtp_service_addr() are destroyed by dns_rr_free(), including
++/*	null lists.
+ /* DIAGNOSTICS
+ /*	Panics: interface violations. For example, calling smtp_domain_addr()
+ /*	when DNS lookups are explicitly disabled.
+@@ -130,7 +151,8 @@ static void smtp_print_addr(const char *what, DNS_RR *addr_list)
+ /* smtp_addr_one - address lookup for one host name */
+ 
+ static DNS_RR *smtp_addr_one(DNS_RR *addr_list, const char *host, int res_opt,
+-			             unsigned pref, DSN_BUF *why)
++			             unsigned pref, unsigned port,
++			             DSN_BUF *why)
+ {
+     const char *myname = "smtp_addr_one";
+     DNS_RR *addr = 0;
+@@ -153,6 +175,8 @@ static DNS_RR *smtp_addr_one(DNS_RR *addr_list, const char *host, int res_opt,
+ 	    if ((addr = dns_sa_to_rr(host, pref, res0->ai_addr)) == 0)
+ 		msg_fatal("host %s: conversion error for address family "
+ 			  "%d: %m", host, res0->ai_addr->sa_family);
++	    addr->pref = pref;
++	    addr->port = port;
+ 	    addr_list = dns_rr_append(addr_list, addr);
+ 	    freeaddrinfo(res0);
+ 	    return (addr_list);
+@@ -172,8 +196,10 @@ static DNS_RR *smtp_addr_one(DNS_RR *addr_list, const char *host, int res_opt,
+ 			     why->reason, DNS_REQ_FLAG_NONE,
+ 			     proto_info->dns_atype_list)) {
+ 	case DNS_OK:
+-	    for (rr = addr; rr; rr = rr->next)
++	    for (rr = addr; rr; rr = rr->next) {
+ 		rr->pref = pref;
++		rr->port = port;
++	    }
+ 	    addr_list = dns_rr_append(addr_list, addr);
+ 	    return (addr_list);
+ 	default:
+@@ -283,10 +309,10 @@ static DNS_RR *smtp_addr_list(DNS_RR *mx_names, DSN_BUF *why)
+      * tweaking the in-process resolver flags.
+      */
+     for (rr = mx_names; rr; rr = rr->next) {
+-	if (rr->type != T_MX)
++	if (rr->type != T_MX && rr->type != T_SRV)
+ 	    msg_panic("smtp_addr_list: bad resource type: %d", rr->type);
+ 	addr_list = smtp_addr_one(addr_list, (char *) rr->data, res_opt,
+-				  rr->pref, why);
++				  rr->pref, rr->port, why);
+     }
+     return (addr_list);
+ }
+@@ -669,7 +695,7 @@ DNS_RR *smtp_host_addr(const char *host, int misc_flags, DSN_BUF *why)
+      * address to internal form. Otherwise, the host is specified by name.
+      */
+ #define PREF0	0
+-    addr_list = smtp_addr_one((DNS_RR *) 0, ahost, res_opt, PREF0, why);
++    addr_list = smtp_addr_one((DNS_RR *) 0, ahost, res_opt, PREF0, 0, why);
+     if (addr_list
+ 	&& (misc_flags & SMTP_MISC_FLAG_LOOP_DETECT)
+ 	&& smtp_find_self(addr_list) != 0) {
+@@ -691,3 +717,135 @@ DNS_RR *smtp_host_addr(const char *host, int misc_flags, DSN_BUF *why)
+ 	smtp_print_addr(host, addr_list);
+     return (addr_list);
+ }
++
++/* smtp_service_addr - service address lookup */
++
++DNS_RR *smtp_service_addr(const char *name, const char *service, DNS_RR **mxrr,
++			          int misc_flags, DSN_BUF *why,
++			          int *found_myself)
++{
++    static VSTRING *srv_qname = 0;
++    const char *str_srv_qname;
++    DNS_RR *srv_names = 0;
++    DNS_RR *addr_list = 0;
++    DNS_RR *self = 0;
++    unsigned best_pref;
++    unsigned best_found;
++    int     r = 0;
++    const char *aname;
++    int     allow_non_srv_fallback = var_allow_srv_fallback;
++
++    dsb_reset(why);
++
++    /*
++     * Sanity check.
++     */
++    if (smtp_dns_support == SMTP_DNS_DISABLED)
++	msg_panic("smtp_service_addr: DNS lookup is disabled");
++
++    if (smtp_dns_support == SMTP_DNS_DNSSEC) {
++	r |= RES_USE_DNSSEC;
++    }
++    if (srv_qname == 0)
++	srv_qname = vstring_alloc(100);
++    vstring_sprintf(srv_qname, "_%s._tcp.%s", service, name);
++    str_srv_qname = STR(srv_qname);
++
++    /*
++     * IDNA support.
++     */
++#ifndef NO_EAI
++    if (!allascii(str_srv_qname)
++	&& (aname = midna_domain_to_ascii(str_srv_qname)) != 0) {
++	if (msg_verbose)
++	    msg_info("%s asciified to %s", str_srv_qname, aname);
++    } else
++#endif
++	aname = str_srv_qname;
++
++    switch (dns_lookup(aname, T_SRV, r, &srv_names, (VSTRING *) 0,
++		       why->reason)) {
++    default:
++	dsb_status(why, "4.4.3");
++	allow_non_srv_fallback |= var_ign_srv_lookup_err;
++	break;
++    case DNS_INVAL:
++	dsb_status(why, "5.4.4");
++	allow_non_srv_fallback |= var_ign_srv_lookup_err;
++	break;
++    case DNS_POLICY:
++	dsb_status(why, "4.7.0");
++	break;
++    case DNS_FAIL:
++	dsb_status(why, "5.4.3");
++	allow_non_srv_fallback |= var_ign_srv_lookup_err;
++	break;
++    case DNS_NULLSRV:
++	dsb_status(why, "5.1.0");
++	break;
++    case DNS_OK:
++	/* Shuffle then sort the SRV rr records by priority and weight. */
++	srv_names = dns_srv_rr_sort(srv_names);
++	best_pref = (srv_names ? srv_names->pref : IMPOSSIBLE_PREFERENCE);
++	addr_list = smtp_addr_list(srv_names, why);
++	if (mxrr)
++	    *mxrr = dns_rr_copy(srv_names);	/* copies one record! */
++	dns_rr_free(srv_names);
++	if (addr_list == 0) {
++	    msg_warn("no SRV host for %s has a valid address record",
++		     str_srv_qname);
++	    break;
++	}
++	/* Optional loop prevention, similar to smtp_domain_addr(). */
++	best_found = (addr_list ? addr_list->pref : IMPOSSIBLE_PREFERENCE);
++	if (msg_verbose)
++	    smtp_print_addr(aname, addr_list);
++	if ((misc_flags & SMTP_MISC_FLAG_LOOP_DETECT)
++	    && (self = smtp_find_self(addr_list)) != 0) {
++	    addr_list = smtp_truncate_self(addr_list, self->pref);
++	    if (addr_list == 0) {
++		if (best_pref != best_found) {
++		    dsb_simple(why, "4.4.4",
++			       "unable to find primary relay for %s",
++			       str_srv_qname);
++		} else {
++		    dsb_simple(why, "5.4.6", "mail for %s loops back to myself",
++			       str_srv_qname);
++		}
++	    }
++	}
++	/* TODO: sort by priority, weight, and address family preference. */
++
++	/* Optional address family balancing, as in smtp_domain_addr(). */
++	if (addr_list && addr_list->next) {
++	    if (var_smtp_mxaddr_limit > 0 && var_smtp_balance_inet_proto)
++		addr_list = smtp_balance_inet_proto(addr_list, misc_flags,
++						    var_smtp_mxaddr_limit);
++	}
++	break;
++    case DNS_NOTFOUND:
++	dsb_status(why, "5.4.4");
++	break;
++    }
++
++    /*
++     * If permitted, fall back to non-SRV record lookups.
++     */
++    if (addr_list == 0 && allow_non_srv_fallback) {
++	msg_info("skipping SRV lookup for %s: %s",
++		 str_srv_qname, STR(why->reason));
++	if (misc_flags & SMTP_MISC_FLAG_FALLBACK_SRV_TO_MX)
++	    addr_list = smtp_domain_addr(name, mxrr, misc_flags, why,
++					 found_myself);
++	else
++	    addr_list = smtp_host_addr(name, misc_flags, why);
++    }
++
++    /*
++     * Only if we're not falling back.
++     */ 
++    else {
++	*found_myself |= (self != 0);
++    }
++    return (addr_list);
++}
+diff --git a/src/smtp/smtp_addr.h b/src/smtp/smtp_addr.h
+index 8f20961..3d70413 100644
+--- a/src/smtp/smtp_addr.h
++++ b/src/smtp/smtp_addr.h
+@@ -18,6 +18,7 @@
+   */
+ extern DNS_RR *smtp_host_addr(const char *, int, DSN_BUF *);
+ extern DNS_RR *smtp_domain_addr(const char *, DNS_RR **, int, DSN_BUF *, int *);
++extern DNS_RR *smtp_service_addr(const char *, const char *, DNS_RR **, int, DSN_BUF *, int *);
+ 
+ /* LICENSE
+ /* .ad
+diff --git a/src/smtp/smtp_connect.c b/src/smtp/smtp_connect.c
+index 4d48883..4b3153f 100644
+--- a/src/smtp/smtp_connect.c
++++ b/src/smtp/smtp_connect.c
+@@ -28,7 +28,8 @@
+ /*	destinations may be specified as "unix:pathname", "inet:host"
+ /*	or "inet:host:port".
+ /*
+-/*	With SMTP, the Internet domain name service is queried for mail
++/*	With SMTP, or with SRV record lookup enabled, the Internet
++/*	domain name service is queried for mail
+ /*	exchanger hosts. Quote the domain name with `[' and `]' to
+ /*	suppress mail exchanger lookups.
+ /*
+@@ -333,7 +334,8 @@ static SMTP_SESSION *smtp_connect_sock(int sock, struct sockaddr *sa,
+ /* smtp_parse_destination - parse host/port destination */
+ 
+ static char *smtp_parse_destination(char *destination, char *def_service,
+-				            char **hostp, unsigned *portp)
++				            char **hostp, char **servicep,
++				            unsigned *portp)
+ {
+     char   *buf = mystrdup(destination);
+     char   *service;
+@@ -349,12 +351,13 @@ static char *smtp_parse_destination(char *destination, char *def_service,
+      * Parse the host/port information. We're working with a copy of the
+      * destination argument so the parsing can be destructive.
+      */
+-    if ((err = host_port(buf, hostp, (char *) 0, &service, def_service)) != 0)
++    if ((err = host_port(buf, hostp, (char *) 0, servicep, def_service)) != 0)
+ 	msg_fatal("%s in server description: %s", err, destination);
+ 
+     /*
+      * Convert service to port number, network byte order.
+      */
++	service = *servicep;
+     if (alldig(service)) {
+ 	if ((port = atoi(service)) >= 65536 || port == 0)
+ 	    msg_fatal("bad network port in destination: %s", destination);
+@@ -635,6 +638,9 @@ static void smtp_update_addr_list(DNS_RR **addr_list, const char *server_addr,
+      * XXX Extend the SMTP_SESSION structure with sockaddr information so that
+      * we can avoid repeated string->binary transformations for the same
+      * address.
++     * 
++     * XXX SRV support: this should match the port, too, otherwise we may
++     * eliminate too many list entries.
+      */
+     if ((aierr = hostaddr_to_sockaddr(server_addr, (char *) 0, 0, &res0)) != 0) {
+ 	msg_warn("hostaddr_to_sockaddr %s: %s",
+@@ -665,6 +671,18 @@ static int smtp_reuse_session(SMTP_STATE *state, DNS_RR **addr_list,
+     DSN_BUF *why = state->why;
+ 
+     /*
++     * This code is called after server address/port lookup, before
++     * iter->host, iter->addr, iter->rr and iter->mx are assigned concrete
++     * values, and while iter->port still corresponds to the nexthop service,
++     * or the default service configured with smtp_tcp_port or lmtp_tcp_port.
++     * 
++     * When a connection is reused by nexthop/service or by server address/port,
++     * iter->host, iter->addr and iter->port are updated with actual values
++     * from the cached session. Additionally, when a connection is searched
++     * by nexthop/service, iter->rr remains null, and when a connection is
++     * searched by server address/port, iter->rr is updated with an actual
++     * server address/port before the search is made.
++     * 
+      * First, search the cache by delivery request nexthop. We truncate the
+      * server address list when all the sessions for this destination are
+      * used up, to reduce the number of variables that need to be checked
+@@ -731,9 +749,7 @@ static int smtp_reuse_session(SMTP_STATE *state, DNS_RR **addr_list,
+ 	    /* XXX Assume there is no code at the end of this loop. */
+ 	    continue;
+ 	}
+-	vstring_strcpy(iter->addr, hostaddr.buf);
+-	vstring_strcpy(iter->host, SMTP_HNAME(addr));
+-	iter->rr = addr;
++	SMTP_ITER_UPDATE_HOST(iter, SMTP_HNAME(addr), hostaddr.buf, addr);
+ #ifdef USE_TLS
+ 	if (!smtp_tls_policy_cache_query(why, state->tls, iter)) {
+ 	    msg_warn("TLS policy lookup error for %s/%s: %s",
+@@ -818,6 +834,7 @@ static void smtp_connect_inet(SMTP_STATE *state, const char *nexthop,
+ 	char   *dest_buf;
+ 	char   *domain;
+ 	unsigned port;
++	char   *service;
+ 	DNS_RR *addr_list;
+ 	DNS_RR *addr;
+ 	DNS_RR *next;
+@@ -825,6 +842,8 @@ static void smtp_connect_inet(SMTP_STATE *state, const char *nexthop,
+ 	int     sess_count;
+ 	SMTP_SESSION *session;
+ 	int     lookup_mx;
++	int     non_dns_or_literal;
++	int     i_am_mx;
+ 	unsigned domain_best_pref;
+ 	MAI_HOSTADDR_STR hostaddr;
+ 
+@@ -834,8 +853,28 @@ static void smtp_connect_inet(SMTP_STATE *state, const char *nexthop,
+ 	/*
+ 	 * Parse the destination. If no TCP port is specified, use the port
+ 	 * that is reserved for the protocol (SMTP or LMTP).
++	 * 
++	 * The 'service' variable corresponds to the remote service specified
++	 * with the nexthop, or the default service configured with
++	 * smtp_tcp_port or lmtp_tcp_port. The 'port' variable and
++	 * SMTP_ITERATOR.port initially correspond to that service. This
++	 * determines what loop prevention will be in effect.
++	 * 
++	 * The SMTP_ITERATOR.port will be overwritten after SRV record lookup.
++	 * This guarantees that the connection cache key contains the correct
++	 * port value when caching and retrieving a connection by its server
++	 * address (and port).
++	 * 
++	 * By design, the connection cache key contains NO port information when
++	 * caching or retrieving a connection by its nexthop destination.
++	 * Instead, the cache key contains the master.cf service name (a
++	 * proxy for all the parameter settings including the default service
++	 * from smtp_tcp_port or lmtp_tcp_port), together with the nexthop
++	 * destination and sender-dependent info. This should be sufficient
++	 * to avoid cross talk between mail streams that should be separated.
+ 	 */
+-	dest_buf = smtp_parse_destination(dest, def_service, &domain, &port);
++	dest_buf = smtp_parse_destination(dest, def_service, &domain,
++					  &service, &port);
+ 	if (var_helpful_warnings && var_smtp_tls_wrappermode == 0
+ 	    && ntohs(port) == 465) {
+ 	    msg_info("SMTPS wrappermode (TCP port 465) requires setting "
+@@ -848,32 +887,48 @@ static void smtp_connect_inet(SMTP_STATE *state, const char *nexthop,
+ 	SMTP_ITER_INIT(iter, dest, NO_HOST, NO_ADDR, port, state);
+ 
+ 	/*
+-	 * Resolve an SMTP or LMTP server. In the case of SMTP, skip mail
+-	 * exchanger lookups when a quoted host is specified or when DNS
+-	 * lookups are disabled.
++	 * Resolve an SMTP or LMTP server. Skip MX or SRV lookups when a
++	 * quoted domain is specified or when DNS lookups are disabled.
+ 	 */
+ 	if (msg_verbose)
+-	    msg_info("connecting to %s port %d", domain, ntohs(port));
++	    msg_info("connecting to %s service %s", domain, service);
++	non_dns_or_literal = (smtp_dns_support == SMTP_DNS_DISABLED
++			      || *dest == '[');
+ 	if (smtp_mode) {
+ 	    if (ntohs(port) == IPPORT_SMTP)
+ 		state->misc_flags |= SMTP_MISC_FLAG_LOOP_DETECT;
+ 	    else
+ 		state->misc_flags &= ~SMTP_MISC_FLAG_LOOP_DETECT;
+-	    lookup_mx = (smtp_dns_support != SMTP_DNS_DISABLED && *dest != '[');
++	    lookup_mx = !non_dns_or_literal;
+ 	} else
+ 	    lookup_mx = 0;
+-	if (!lookup_mx) {
++
++	/*
++	 * Look up SRV and address records and fall back to non-SRV lookups
++	 * if permitted by configuration settings, or look up MX and address
++	 * records, or look up address records only.
++	 */
++	i_am_mx = 0;
++	addr_list = 0;
++	if (!non_dns_or_literal && smtp_use_srv_lookup
++	    && string_list_match(smtp_use_srv_lookup, service)) {
++	    if (lookup_mx)
++		state->misc_flags |= SMTP_MISC_FLAG_FALLBACK_SRV_TO_MX;
++	    else
++		state->misc_flags &= ~SMTP_MISC_FLAG_FALLBACK_SRV_TO_MX;
++	    addr_list = smtp_service_addr(domain, service, &iter->mx,
++					  state->misc_flags, why, &i_am_mx);
++	} else if (!lookup_mx) {
++	    /* Non-DNS, literal, or non-SMTP service */
+ 	    addr_list = smtp_host_addr(domain, state->misc_flags, why);
+ 	    /* XXX We could be an MX host for this destination... */
+ 	} else {
+-	    int     i_am_mx = 0;
+-
+ 	    addr_list = smtp_domain_addr(domain, &iter->mx, state->misc_flags,
+ 					 why, &i_am_mx);
+-	    /* If we're MX host, don't connect to non-MX backups. */
+-	    if (i_am_mx)
+-		state->misc_flags |= SMTP_MISC_FLAG_FINAL_NEXTHOP;
+ 	}
++	/* If we're MX host, don't connect to non-MX backups. */
++	if (i_am_mx)
++	    state->misc_flags |= SMTP_MISC_FLAG_FINAL_NEXTHOP;
+ 
+ 	/*
+ 	 * Don't try fall-back hosts if mail loops to myself. That would just
+@@ -966,9 +1021,7 @@ static void smtp_connect_inet(SMTP_STATE *state, const char *nexthop,
+ 		/* XXX Assume there is no code at the end of this loop. */
+ 		continue;
+ 	    }
+-	    vstring_strcpy(iter->addr, hostaddr.buf);
+-	    vstring_strcpy(iter->host, SMTP_HNAME(addr));
+-	    iter->rr = addr;
++	    SMTP_ITER_UPDATE_HOST(iter, SMTP_HNAME(addr), hostaddr.buf, addr);
+ #ifdef USE_TLS
+ 	    if (!smtp_tls_policy_cache_query(why, state->tls, iter)) {
+ 		msg_warn("TLS policy lookup for %s/%s: %s",
+diff --git a/src/smtp/smtp_params.c b/src/smtp/smtp_params.c
+index 561f6a0..b893a76 100644
+--- a/src/smtp/smtp_params.c
++++ b/src/smtp/smtp_params.c
+@@ -65,6 +65,7 @@
+ 	VAR_SMTP_DSN_FILTER, DEF_SMTP_DSN_FILTER, &var_smtp_dsn_filter, 0, 0,
+ 	VAR_SMTP_DNS_RE_FILTER, DEF_SMTP_DNS_RE_FILTER, &var_smtp_dns_re_filter, 0, 0,
+ 	VAR_TLSPROXY_SERVICE, DEF_TLSPROXY_SERVICE, &var_tlsproxy_service, 1, 0,
++	VAR_USE_SRV_LOOKUP, DEF_USE_SRV_LOOKUP, &var_use_srv_lookup, 0, 0,
+ 	0,
+     };
+     static const CONFIG_TIME_TABLE smtp_time_table[] = {
+@@ -130,5 +131,7 @@
+ 	VAR_SMTP_REC_DEADLINE, DEF_SMTP_REC_DEADLINE, &var_smtp_rec_deadline,
+ 	VAR_SMTP_DUMMY_MAIL_AUTH, DEF_SMTP_DUMMY_MAIL_AUTH, &var_smtp_dummy_mail_auth,
+ 	VAR_SMTP_BALANCE_INET_PROTO, DEF_SMTP_BALANCE_INET_PROTO, &var_smtp_balance_inet_proto,
++	VAR_IGN_SRV_LOOKUP_ERR, DEF_IGN_SRV_LOOKUP_ERR, &var_ign_srv_lookup_err,
++	VAR_ALLOW_SRV_FALLBACK, DEF_ALLOW_SRV_FALLBACK, &var_allow_srv_fallback,
+ 	0,
+     };
+diff --git a/src/smtp/smtp_session.c b/src/smtp/smtp_session.c
+index 1b3a20e..3ac4ccc 100644
+--- a/src/smtp/smtp_session.c
++++ b/src/smtp/smtp_session.c
+@@ -129,6 +129,7 @@
+ #define SESS_ATTR_DEST		"destination"
+ #define SESS_ATTR_HOST		"host_name"
+ #define SESS_ATTR_ADDR		"host_addr"
++#define SESS_ATTR_PORT		"host_port"
+ #define SESS_ATTR_DEST_FEATURES	"destination_features"
+ 
+ #define SESS_ATTR_TLS_LEVEL	"tls_level"
+@@ -258,6 +259,7 @@ int     smtp_session_passivate(SMTP_SESSION *session, VSTRING *dest_prop,
+ 			    SEND_ATTR_STR(SESS_ATTR_DEST, STR(iter->dest)),
+ 			    SEND_ATTR_STR(SESS_ATTR_HOST, STR(iter->host)),
+ 			    SEND_ATTR_STR(SESS_ATTR_ADDR, STR(iter->addr)),
++			    SEND_ATTR_UINT(SESS_ATTR_PORT, iter->port),
+ 			    SEND_ATTR_INT(SESS_ATTR_DEST_FEATURES,
+ 			 session->features & SMTP_FEATURE_DESTINATION_MASK),
+ 			    ATTR_TYPE_END) != 0
+@@ -397,9 +399,10 @@ SMTP_SESSION *smtp_session_activate(int fd, SMTP_ITERATOR *iter,
+ 			       RECV_ATTR_STR(SESS_ATTR_DEST, iter->dest),
+ 			       RECV_ATTR_STR(SESS_ATTR_HOST, iter->host),
+ 			       RECV_ATTR_STR(SESS_ATTR_ADDR, iter->addr),
++			       RECV_ATTR_UINT(SESS_ATTR_PORT, &iter->port),
+ 			       RECV_ATTR_INT(SESS_ATTR_DEST_FEATURES,
+ 					     &dest_features),
+-			       ATTR_TYPE_END) != 4
++			       ATTR_TYPE_END) != 5
+ 	    || vstream_fclose(mp) != 0) {
+ 	    msg_warn("smtp_session_passivate: bad cached dest properties");
+ 	    SMTP_SESSION_ACTIVATE_ERR_RETURN();
+diff --git a/src/smtpd/smtpd_check.c b/src/smtpd/smtpd_check.c
+index 85d5944..a60e878 100644
+--- a/src/smtpd/smtpd_check.c
++++ b/src/smtpd/smtpd_check.c
+@@ -3056,8 +3056,8 @@ static int check_server_access(SMTPD_STATE *state, const char *table,
+ 	|| type == T_AAAA
+ #endif
+ 	) {
+-	server_list = dns_rr_create(domain, domain, T_MX, C_IN, 0, 0,
+-				    domain, strlen(domain) + 1);
++	server_list = dns_rr_create_nopref(domain, domain, T_MX, C_IN, 0,
++					   domain, strlen(domain) + 1);
+     } else {
+ 	dns_status = dns_lookup(domain, type, 0, &server_list,
+ 				(VSTRING *) 0, (VSTRING *) 0);
+@@ -3065,8 +3065,8 @@ static int check_server_access(SMTPD_STATE *state, const char *table,
+ 	    return (SMTPD_CHECK_DUNNO);
+ 	if (dns_status == DNS_NOTFOUND /* Not: h_errno == NO_DATA */ ) {
+ 	    if (type == T_MX) {
+-		server_list = dns_rr_create(domain, domain, type, C_IN, 0, 0,
+-					    domain, strlen(domain) + 1);
++		server_list = dns_rr_create_nopref(domain, domain, type, C_IN,
++					     0, domain, strlen(domain) + 1);
+ 		dns_status = DNS_OK;
+ 	    } else if (type == T_NS /* && h_errno == NO_DATA */ ) {
+ 		while ((domain = strchr(domain, '.')) != 0 && domain[1]) {
+diff --git a/src/util/attr.h b/src/util/attr.h
+index dc6f9f7..a890a5b 100644
+--- a/src/util/attr.h
++++ b/src/util/attr.h
+@@ -61,6 +61,7 @@ typedef int (*ATTR_PRINT_SLAVE_FN) (ATTR_PRINT_MASTER_FN, VSTREAM *, int, void *
+   * for documentation.
+   */
+ #define SEND_ATTR_INT(name, val)	ATTR_TYPE_INT, CHECK_CPTR(ATTR, char, (name)), CHECK_VAL(ATTR, int, (val))
++#define SEND_ATTR_UINT(name, val)	ATTR_TYPE_INT, CHECK_CPTR(ATTR, char, (name)), CHECK_VAL(ATTR, unsigned, (val))
+ #define SEND_ATTR_STR(name, val)	ATTR_TYPE_STR, CHECK_CPTR(ATTR, char, (name)), CHECK_CPTR(ATTR, char, (val))
+ #define SEND_ATTR_HASH(val)		ATTR_TYPE_HASH, CHECK_CPTR(ATTR, HTABLE, (val))
+ #define SEND_ATTR_NV(val)		ATTR_TYPE_NV, CHECK_CPTR(ATTR, NVTABLE, (val))
+@@ -69,6 +70,7 @@ typedef int (*ATTR_PRINT_SLAVE_FN) (ATTR_PRINT_MASTER_FN, VSTREAM *, int, void *
+ #define SEND_ATTR_FUNC(func, val)	ATTR_TYPE_FUNC, CHECK_VAL(ATTR, ATTR_PRINT_SLAVE_FN, (func)), CHECK_CPTR(ATTR, void, (val))
+ 
+ #define RECV_ATTR_INT(name, val)	ATTR_TYPE_INT, CHECK_CPTR(ATTR, char, (name)), CHECK_PTR(ATTR, int, (val))
++#define RECV_ATTR_UINT(name, val)	ATTR_TYPE_INT, CHECK_CPTR(ATTR, char, (name)), CHECK_PTR(ATTR, unsigned, (val))
+ #define RECV_ATTR_STR(name, val)	ATTR_TYPE_STR, CHECK_CPTR(ATTR, char, (name)), CHECK_PTR(ATTR, VSTRING, (val))
+ #define RECV_ATTR_HASH(val)		ATTR_TYPE_HASH, CHECK_PTR(ATTR, HTABLE, (val))
+ #define RECV_ATTR_NV(val)		ATTR_TYPE_NV, CHECK_PTR(ATTR, NVTABLE, (val))
+@@ -79,9 +81,11 @@ typedef int (*ATTR_PRINT_SLAVE_FN) (ATTR_PRINT_MASTER_FN, VSTREAM *, int, void *
+ CHECK_VAL_HELPER_DCL(ATTR, ssize_t);
+ CHECK_VAL_HELPER_DCL(ATTR, long);
+ CHECK_VAL_HELPER_DCL(ATTR, int);
++CHECK_VAL_HELPER_DCL(ATTR, unsigned);
+ CHECK_PTR_HELPER_DCL(ATTR, void);
+ CHECK_PTR_HELPER_DCL(ATTR, long);
+ CHECK_PTR_HELPER_DCL(ATTR, int);
++CHECK_PTR_HELPER_DCL(ATTR, unsigned);
+ CHECK_PTR_HELPER_DCL(ATTR, VSTRING);
+ CHECK_PTR_HELPER_DCL(ATTR, NVTABLE);
+ CHECK_PTR_HELPER_DCL(ATTR, HTABLE);

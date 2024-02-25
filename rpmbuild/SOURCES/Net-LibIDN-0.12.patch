@@ -1,0 +1,65 @@
+--- a/Net-LibIDN-0.12/Makefile.PL
++++ b/Net-LibIDN-0.12/Makefile.PL2
+@@ -47,23 +47,17 @@ sub InitMakeParams
+ 		"disable-tld" => \$disable_tld
+ 	);
+ 
++	$Params{LIBS} = '';
+ 	if ($libdir)
+ 	{
+-		$Params{LIBS} = "-L$libdir -lidn";
+-	}
+-	else
+-	{
+-		$Params{LIBS} = $Config{ldflags} . ' -lidn';
++		$Params{LIBS} .= "-L$libdir ";
+ 	}
++	$Params{LIBS} .= '-lidn';
+ 
+ 	if ($incdir)
+ 	{
+ 		$Params{INC} = "-I$incdir";
+ 	}
+-	else
+-	{
+-		$Params{INC} = '';
+-	}
+ 
+ 	my $libidn = CheckLibidn($Params{INC}, $Params{LIBS});
+ 
+@@ -146,11 +140,24 @@ sub FilterTLD
+ 	}
+ }
+ 
++sub concat {
++	my ($a, $b) = @_;
++	if (!defined $a)
++	{
++		$a = '';
++	}
++	if (!defined $b)
++	{
++		$b = '';
++	};
++	return ($a . ' ' . $b);
++}
++
+ sub CheckCCode
+ {
+ 	my $code = shift;
+-	my $cflags = shift;
+-	my $ldflags = shift;
++	my $cflags = concat($Config{ccflags}, shift);
++	my $ldflags = concat($Config{ldflags}, shift);
+ 	my $output = shift;
+ 	my $test = '__test'.$testno++;
+ 	local * FILE;
+@@ -165,7 +172,7 @@ sub CheckCCode
+ 		return 0;
+ 	}
+ 
+-	foreach my $cc (qw/cc gcc/)
++	foreach my $cc ($Config{cc}, qw/cc gcc/)
+ 	{
+ 		unlink($test);
+ 		system "$cc $cflags -o $test $test.c $ldflags";

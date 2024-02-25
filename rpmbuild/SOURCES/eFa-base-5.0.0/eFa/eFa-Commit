@@ -1,0 +1,1127 @@
+#!/bin/bash
+#-----------------------------------------------------------------------------#
+# eFa 4.0.4 initial configuration commit script
+#-----------------------------------------------------------------------------#
+# Copyright (C) 2013~2024 https://efa-project.org
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#-----------------------------------------------------------------------------#
+
+# +---------------------------------------------------+
+# Function to create a random password
+# +---------------------------------------------------+
+function randompw()
+{
+  PASSWD=""
+  PASSWD=`openssl rand -base64 32`
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+# Install Open VM Tools
+# +---------------------------------------------------+
+func_Install-OpenVMTools(){
+    yum -y install glib2-devel pam-devel libdnet-devel gcc-c++ libicu-devel open-vm-tools
+    [ $? -ne 0 ] && exit 1
+    systemctl enable vmtoolsd
+    [ $? -ne 0 ] && exit 1
+    checkmodule -M -m -o /var/eFa/lib/selinux/eFavmtools.mod /var/eFa/lib/selinux/eFavmtools.te
+    [ $? -ne 0 ] && exit 1
+    semodule_package -o /var/eFa/lib/selinux/eFavmtools.pp -m /var/eFa/lib/selinux/eFavmtools.mod
+    [ $? -ne 0 ] && exit 1
+    semodule -i /var/eFa/lib/selinux/eFavmtools.pp
+    [ $? -ne 0 ] && exit 1
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+# Install Hyper-V Tools
+# +---------------------------------------------------+
+func_Install-HyperVTools(){
+    yum -y install hyperv-tools hyperv-daemons hypervkvpd hypervvssd
+    [ $? -ne 0 ] && exit 1
+    systemctl enable hypervkvpd
+    [ $? -ne 0 ] && exit 1
+    systemctl enable hypervvssd
+    [ $? -ne 0 ] && exit 1
+    checkmodule -M -m -o /var/eFa/lib/selinux/eFahyperv.mod /var/eFa/lib/selinux/eFahyperv.te
+    [ $? -ne 0 ] && exit 1
+    semodule_package -o /var/eFa/lib/selinux/eFahyperv.pp -m /var/eFa/lib/selinux/eFahyperv.mod
+    [ $? -ne 0 ] && exit 1
+    semodule -i /var/eFa/lib/selinux/eFahyperv.pp
+    [ $? -ne 0 ] && exit 1
+}
+# +---------------------------------------------------+
+
+# +---------------------------------------------------+
+# Install QEMU Agent
+# +---------------------------------------------------+
+func_Install-QEMUAgent(){
+    yum -y install qemu-guest-agent
+    [ $? -ne 0 ] && exit 1
+    systemctl enable qemu-guest-agent
+    [ $? -ne 0 ] && exit 1
+    checkmodule -M -m -o /var/eFa/lib/selinux/eFaqemu.mod /var/eFa/lib/selinux/eFaqemu.te
+    [ $? -ne 0 ] && exit 1
+    semodule_package -o /var/eFa/lib/selinux/eFaqemu.pp -m /var/eFa/lib/selinux/eFaqemu.mod
+    [ $? -ne 0 ] && exit 1
+    semodule -i /var/eFa/lib/selinux/eFaqemu.pp
+    [ $? -ne 0 ] && exit 1
+}
+# +---------------------------------------------------+
+
+red='\E[00;31m'
+green='\E[00;32m'
+yellow='\E[00;33m'
+blue='\E[00;34m'
+magenta='\E[00;35'
+cyan='\E[00;36m'
+clean='\e[00m'
+
+if [[ -f /etc/eFa/MySQL-Config && -n $(grep MYSQLROOTPWD /etc/eFa/MySQL-Config) ]]; then
+  initpassword=$(grep MYSQLROOTPWD /etc/eFa/MySQL-Config | sed 's/^.*://')
+else
+  initpassword="eFaPr0j3ct"
+fi
+
+CONFIGURED="`grep CONFIGURED /etc/eFa/eFa-Config | sed 's/^.*://'`"
+if [ $CONFIGURED != "NO" ]; then
+  echo "Already configured, exiting."
+  exit 1
+fi
+
+verbose=0
+startmariadb=0
+confighost=0
+configdns=0
+configip=0
+genhostkeys=0
+enablerecursion=0
+configtzone=0
+configrazor=0
+configclam=0
+configsa=0
+configtransport=0
+configmailscanner=0
+configmailwatch=0
+configsasl=0
+configsqlgrey=0
+configdmarc=0
+configmysql=0
+configapache=0
+configyumcron=0
+configroot=0
+configcli=0
+configcert=0
+finalize=0
+HOSTNAME=
+DOMAINNAME=
+IPV4ADDRESS=
+IPV6ADDRESS=
+DNSIP1=
+DNSIP2=
+INTERFACE=
+IPV4NETMASK=
+IPV4GATEWAY=
+IPV6DNS=
+IPV6MASK=
+IPV6GATEWAY=
+TZONE=
+IANACODE=
+ORGNAME=
+MAILSERVER=
+ADMINEMAIL=
+efauserpwd=
+USERNAME=
+CLIUSERNAME=
+efaclipwd=
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    # Commit actions
+      --commitall)
+        startmariadb=1
+        confighost=1
+        configdns=1
+        genhostkeys=1
+        configtzone=1
+        configrazor=1
+        configsa=1
+        configip=1
+        configtransport=1
+        configmailscanner=1
+        configmailwatch=1
+        configsasl=1
+        configsqlgrey=1
+        configdmarc=1
+        configmysql=1
+        configapache=1
+        configyumcron=1
+        configroot=1
+        configcli=1
+        configcert=1
+        finalize=1
+    ;;
+      --verbose)
+        verbose=1
+    ;;
+    # Individual actions
+      --startmariadb)
+        startmariadb=1
+    ;;
+      --confighost)
+        confighost=1
+    ;;
+      --configdns)
+        configdns=1
+    ;;
+      --configip)
+        configip=1
+    ;;
+      --genhostkeys)
+        genhostkeys=1
+    ;;
+      --configtzone)
+        configtzone=1
+    ;;
+      --configrazor)
+        configrazor=1
+    ;;
+      --configsa)
+        configsa=1
+    ;;
+      --configtransport)
+        configtransport=1
+    ;;
+      --configmailscanner)
+        configmailscanner=1
+    ;;
+      --configmailwatch)
+        configmailwatch=1
+    ;;
+      --configsasl)
+        configsasl=1
+    ;;
+      --configsqlgrey)
+        configsqlgrey=1
+    ;;
+      --configdmarc)
+        configdmarc=1
+    ;;
+      --configmysql)
+        configmysql=1
+    ;;
+      --configapache)
+        configapache=1
+    ;;
+      --configyumcron)
+        configyumcron=1
+    ;;
+      --configroot)
+        configroot=1
+    ;;
+      --configcli)
+        configcli=1
+    ;;
+      --configcert)
+        configcert=1
+    ;;
+      --finalize)
+        finalize=1
+    ;;
+    # Parameters
+      --hostname=*)
+        HOSTNAME=${1#*=}
+        if [[ -z $(grep ^HOSTNAME /etc/eFa/eFa-Config) ]]; then
+          echo "HOSTNAME:$HOSTNAME" >> /etc/eFa/eFa-Config
+        else
+          sed -i "/^HOSTNAME:/ c\HOSTNAME:$HOSTNAME" /etc/eFa/eFa-Config
+        fi
+    ;;
+      --domainname=*)
+        DOMAINNAME=${1#*=}
+        if [[ -z $(grep ^DOMAINNAME /etc/eFa/eFa-Config) ]]; then
+          echo "DOMAINNAME:$DOMAINNAME" >> /etc/eFa/eFa-Config
+        else
+          sed -i "/^DOMAINNAME:/ c\DOMAINNAME:$DOMAINNAME" /etc/eFa/eFa-Config
+        fi
+    ;;
+      --ipv4address=*)
+        IPV4ADDRESS=${1#*=}
+        if [[ -z $(grep ^IPV4ADDRESS /etc/eFa/eFa-Config) ]]; then
+          echo "IPV4ADDRESS:$IPV4ADDRESS" >> /etc/eFa/eFa-Config
+        else
+          sed -i "/^IPV4ADDRESS:/ c\IPV4ADDRESS:$IPV4ADDRESS" /etc/eFa/eFa-Config
+        fi
+    ;;
+      --ipv6address=*)
+        IPV6ADDRESS=${1#*=}
+        if [[ -z $(grep ^IPV6ADDRESS /etc/eFa/eFa-Config) ]]; then
+          echo "IPV6ADDRESS:$IPV6ADDRESS" >> /etc/eFa/eFa-Config
+        else
+          sed -i "/^IPV6ADDRESS:/ c\IPV6ADDRESS:$IPV6ADDRESS" /etc/eFa/eFa-Config
+        fi
+    ;;
+      --enablerecursion=*)
+        enablerecursion=${1#*=}
+        if [[ -z $(grep ^RECURSION /etc/eFa/eFa-Config) ]]; then
+          if [[ "$enablerecursion" -eq 1 ]]; then
+            echo "RECURSION:ENABLED" >> /etc/eFa/eFa-Config
+          else
+            echo "RECURSION:DISABLED" >> /etc/eFa/eFa-Config
+          fi
+        else
+          if [[ "$enablerecursion" -eq 1 ]]; then
+            sed -i "/^RECURSION:/ c\RECURSION:ENABLED" /etc/eFa/eFa-Config
+          else
+            sed -i "/^RECURSION:/ c\RECURSION:DISABLED" /etc/eFa/eFa-Config
+          fi
+        fi
+    ;;
+      --dnsip1=*)
+        DNSIP1=${1#*=}
+        if [[ -z $(grep ^DNSIP1 /etc/eFa/eFa-Config) ]]; then
+          echo "DNSIP1:$DNSIP1" >> /etc/eFa/eFa-Config
+        else
+          sed -i "/^DNSIP1:/ c\DNSIP1:$DNSIP1" /etc/eFa/eFa-Config
+        fi
+    ;;
+      --dnsip2=*)
+        DNSIP2=${1#*=}
+        if [[ -z $(grep ^DNSIP2 /etc/eFa/eFa-Config) ]]; then
+          echo "DNSIP2:$DNSIP2" >> /etc/eFa/eFa-Config
+        else
+          sed -i "/^DNSIP2:/ c\DNSIP2:$DNSIP2" /etc/eFa/eFa-Config
+        fi
+    ;;
+      --interface=*)
+        INTERFACE=${1#*=}
+        if [[ -z $(grep ^INTERFACE /etc/eFa/eFa-Config) ]]; then
+          echo "INTERFACE:$INTERFACE" >> /etc/eFa/eFa-Config
+        else
+          sed -i "/^INTERFACE:/ c\INTERFACE:$INTERFACE" /etc/eFa/eFa-Config
+        fi
+    ;;
+      --ipv4netmask=*)
+        IPV4NETMASK=${1#*=}
+        if [[ -z $(grep ^IPV4NETMASK /etc/eFa/eFa-Config) ]]; then
+          echo "IPV4NETMASK:$IPV4NETMASK" >> /etc/eFa/eFa-Config
+        else
+          sed -i "/^IPV4NETMASK:/ c\IPV4NETMASK:$IPV4NETMASK" /etc/eFa/eFa-Config
+        fi
+    ;;
+      --ipv4gateway=*)
+        IPV4GATEWAY=${1#*=}
+        if [[ -z $(grep ^IPV4GATEWAY /etc/eFa/eFa-Config) ]]; then
+          echo "IPV4GATEWAY:$IPV4GATEWAY" >> /etc/eFa/eFa-Config
+        else
+          sed -i "/^IPV4GATEWAY:/ c\IPV4GATEWAY:$IPV4GATEWAY" /etc/eFa/eFa-Config
+        fi
+    ;;
+      --ipv6mask=*)
+        IPV6MASK=${1#*=}
+        if [[ -z $(grep ^IPV6MASK /etc/eFa/eFa-Config) ]]; then
+          echo "IPV6MASK:$IPV6MASK" >> /etc/eFa/eFa-Config
+        else
+          sed -i "/^IPV6MASK:/ c\IPV6MASK:$IPV6MASK" /etc/eFa/eFa-Config
+        fi
+    ;;
+      --ipv6dns=*)
+        IPV6DNS=${1#*=}
+        if [[ -z $(grep ^IPV6DNS /etc/eFa/eFa-Config) ]]; then
+          if [[ "$IPV6DNS" -eq 1 ]]; then
+            echo "IPV6DNS:yes" >> /etc/eFa/eFa-Config
+          else
+            echo "IPV6DNS:no" >> /etc/eFa/eFa-Config
+          fi
+        else
+          if [[ "$IPV6DNS" -eq 1 ]]; then
+            sed -i "/^IPV6DNS:/ c\IPV6DNS:yes" /etc/eFa/eFa-Config
+          else
+            sed -i "/^IPV6DNS:/ c\IPV6DNS:no" /etc/eFa/eFa-Config
+          fi
+        fi
+    ;;
+      --ipv6gateway=*)
+        IPV6GATEWAY=${1#*=}
+        if [[ -z $(grep ^IPV6GATEWAY /etc/eFa/eFa-Config) ]]; then
+          echo "IPV6GATEWAY:$IPV6GATEWAY" >> /etc/eFa/eFa-Config
+        else
+          sed -i "/^IPV6GATEWAY:/ c\IPV6GATEWAY:$IPV6GATEWAY" /etc/eFa/eFa-Config
+        fi
+    ;;
+      --timezone=*)
+        TZONE=${1#*=}
+        if [[ -z $(grep ^TZONE /etc/eFa/eFa-Config) ]]; then
+          echo "TZONE:$TZONE" >> /etc/eFa/eFa-Config
+        else
+          sed -i "/^TZONE:/ c\TZONE:$TZONE" /etc/eFa/eFa-Config
+        fi
+    ;;
+      --isutc=*)
+        ISUTC=${1#*=}
+        if [[ -z $(grep ^ISUTC /etc/eFa/eFa-Config) ]]; then
+          echo "ISUTC:$ISUTC" >> /etc/eFa/eFa-Config
+        else
+          sed -i "/^ISUTC:/ c\ISUTC:$ISUTC" /etc/eFa/eFa-Config
+        fi
+    ;;
+      --orgname=*)
+        ORGNAME=${1#*=}
+        if [[ -z $(grep ^ORGNAME /etc/eFa/eFa-Config) ]]; then
+          echo "ORGNAME:$ORGNAME" >> /etc/eFa/eFa-Config
+        else
+          sed -i "/^ORGNAME:/ c\ORGNAME:$ORGNAME" /etc/eFa/eFa-Config
+        fi
+    ;;
+      --mailserver=*)
+        MAILSERVER=${1#*=}
+        if [[ -z $(grep ^MAILSERVER /etc/eFa/eFa-Config) ]]; then
+          echo "MAILSERVER:$MAILSERVER" >> /etc/eFa/eFa-Config
+        else
+          sed -i "/^MAILSERVER:/ c\MAILSERVER:$MAILSERVER" /etc/eFa/eFa-Config
+        fi
+    ;;
+      --adminemail=*)
+        ADMINEMAIL=${1#*=}
+        if [[ -z $(grep ^ADMINEMAIL /etc/eFa/eFa-Config) ]]; then
+          echo "ADMINEMAIL:$ADMINEMAIL" >> /etc/eFa/eFa-Config
+        else
+          sed -i "/^ADMINEMAIL:/ c\ADMINEMAIL:$ADMINEMAIL" /etc/eFa/eFa-Config
+        fi
+    ;;
+      --efauserpwd=*)
+        efauserpwd=${1#*=}
+    ;;
+      --username=*)
+        USERNAME=${1#*=}
+    ;;
+      --cliusername=*)
+        CLIUSERNAME=${1#*=}
+    ;;
+      --efaclipwd=*)
+        efaclipwd=${1#*=}
+    ;;
+      --configvirtual=*)
+        configvirtual=${1#*=}
+    ;;
+  esac
+  shift
+done
+
+if [[ $startmariadb -eq 1 ]]; then
+  # Start mariadb Daemon
+  [ $verbose -eq 1 ] && echo -e "$green[eFa]$clean - Starting MariaDB and Configuring"
+  systemctl start mariadb
+  [ $? -ne 0 ] && exit 1
+
+  # Make sure temp is present for mariadb
+  mkdir /var/lib/mysql/temp && chown mysql:mysql /var/lib/mysql/temp
+  sed -i "/^\[mysqld\]/ a\tmpdir = /var/lib/mysql/temp" /etc/my.cnf.d/mariadb-server.cnf
+
+  # remove default security flaws from MySQL.
+  password="eFaPr0j3ct"
+  /usr/bin/mysqladmin -u root password "$password"
+
+  /usr/bin/mysqladmin -u root -p"$password" -h localhost.localdomain password "$password"
+  
+  /usr/bin/mysql -u root -p"$password" -e "DROP USER '';" >/dev/null 2>&1
+
+  /usr/bin/mysql -u root -p"$password" -e "DROP USER 'root';" >/dev/null 2>&1
+
+  # Create the databases
+  /usr/bin/mysql -u root -p"$password" -e "CREATE DATABASE sa_bayes"
+
+  /usr/bin/mysql -u root -p"$password" -e "CREATE DATABASE sqlgrey"
+
+  # Create and populate the mailscanner db
+  /usr/bin/mysql -u root -p"$password" < /usr/src/eFa/mariadb/create.sql
+
+  # Create the DMARC db
+  /usr/bin/mysql -u root -p"$password" < /usr/src/eFa/mariadb/schema.mysql
+
+  # Create eFa Token db
+  /usr/bin/mysql -u root -p"$password" < /var/eFa/lib/token/efatokens.sql
+
+  # Create the users
+  /usr/bin/mysql -u root -p"$password" -e "GRANT SELECT,INSERT,UPDATE,DELETE on sa_bayes.* to 'sa_user'@'localhost' identified by '$password'"
+
+  # mailwatch mysql user and login user
+  /usr/bin/mysql -u root -p"$password" -e "GRANT ALL ON mailscanner.* TO mailwatch@localhost IDENTIFIED BY '$password';"
+
+  /usr/bin/mysql -u root -p"$password" -e "GRANT FILE ON *.* to mailwatch@localhost IDENTIFIED BY '$password';"
+
+  # sqlgrey user
+  /usr/bin/mysql -u root -p"$password" -e "GRANT ALL on sqlgrey.* to 'sqlgrey'@'localhost' identified by '$password'"
+
+  # DMARC user
+  /usr/bin/mysql -u root -p"$password" -e "GRANT ALL on opendmarc.* to 'opendmarc'@'localhost' identified by '$password'"
+
+  /usr/bin/mysql -u root -p"$password" -e "GRANT ALL on efa.* to 'efa'@'localhost' identified by '$password'"
+
+  # flush
+  /usr/bin/mysql -u root -p"$password" -e "FLUSH PRIVILEGES;"
+
+  # populate the sa_bayes DB with txrep table
+  /usr/bin/mysql -u root -p"$password" sa_bayes < /usr/src/eFa/mariadb/bayes_mysql.sql
+
+  
+  systemctl daemon-reload
+  [ $? -ne 0 ] && exit 1
+  systemctl restart mariadb
+  [ $? -ne 0 ] && exit 1
+fi
+
+if [[ $confighost -eq 1 ]]; then
+  # Network settings
+  [ $verbose -eq 1 ] && echo -e "$green[eFa]$clean - Configuring hostname and domainname"
+  echo "127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4" > /etc/hosts
+  [ $? -ne 0 ] && exit 1
+  echo "::1         localhost localhost.localdomain localhost6 localhost6.localdomain6" >> /etc/hosts
+  [ $? -ne 0 ] && exit 1
+  if [[ -n $IPV4ADDRESS ]]; then
+    echo "$IPV4ADDRESS   $HOSTNAME.$DOMAINNAME   $HOSTNAME" >> /etc/hosts
+    [ $? -ne 0 ] && exit 1
+  fi
+  if [[ -n $IPV6ADDRESS ]]; then
+    echo "$IPV6ADDRESS   $HOSTNAME.$DOMAINNAME   $HOSTNAME" >> /etc/hosts
+    [ $? -ne 0 ] && exit 1
+  fi
+
+  echo "$HOSTNAME.$DOMAINNAME" > /etc/hostname
+  [ $? -ne 0 ] && exit 1
+  hostnamectl set-hostname $HOSTNAME.$DOMAINNAME
+  [ $? -ne 0 ] && exit 1
+ 
+  # Add Received header check to remove localhost entry
+  if [[ -f /etc/postfix/header_checks.bak ]]; then
+    rm -f /etc/postfix/header_checks
+    [ $? -ne 0 ] && exit 1
+    cp -f /etc/postfix/header_checks.bak /etc/postfix/header_checks
+    [ $? -ne 0 ] && exit 1
+  else
+    cp -f /etc/postfix/header_checks /etc/postfix/header_checks.bak
+  fi
+
+  echo '/^Received:\ from\ '$HOSTNAME.$DOMAINNAME'\ \(localhost\ \[127.0.0.1/ IGNORE' >> /etc/postfix/header_checks
+  [ $? -ne 0 ] && exit 1
+  echo '/^Received:\ from\ '$HOSTNAME.$DOMAINNAME'\ \(localhost\ \[::1/ IGNORE' >> /etc/postfix/header_checks
+  [ $? -ne 0 ] && exit 1
+  echo '/^Received:\ from\ localhost\ \(localhost\ \[127.0.0.1\]\)/ IGNORE' >> /etc/postfix/header_checks
+  [ $? -ne 0 ] && exit 1
+
+  # Apache
+  sed -i "/^#ServerName\s/ c\ServerName $HOSTNAME.$DOMAINNAME:80" /etc/httpd/conf/httpd.conf
+  sed -i "/^#ServerName\s/ c\ServerName $HOSTNAME.$DOMAINNAME:443" /etc/httpd/conf.d/ssl.conf
+
+  fi
+
+if [[ $configdns -eq 1 ]]; then
+  [ $verbose -eq 1 ] && echo -e "$green[eFa]$clean - Setting DNS"
+
+  if [[ $IPV6DNS -eq 0 ]]; then
+    sed -i '/^\t# do-ip6:/ c\\tdo-ip6: no' /etc/unbound/unbound.conf
+  fi
+
+  # Disable nm from overriding dns
+  systemctl enable NetworkManager
+  [ $? -ne 0 ] && exit 1
+  systemctl start NetworkManager
+  [ $? -ne 0 ] && exit 1
+
+  if [[ -z $(grep "^dns=none" /etc/NetworkManager/NetworkManager.conf) ]]; then
+    sed -i "/^\[main\]$/ a\dns=none" /etc/NetworkManager/NetworkManager.conf
+  fi
+
+  systemctl reload NetworkManager
+  [ $? -ne 0 ] && exit 1
+  
+  # Reset resolv.conf in case of override (CentOS 8)
+  echo "nameserver 127.0.0.1" > /etc/resolv.conf
+  echo "nameserver ::1" >> /etc/resolv.conf
+
+  # Start unbound now to allow DNS resolution
+  systemctl enable unbound.service
+  [ $? -ne 0 ] && exit 1
+  systemctl start unbound.service
+  [ $? -ne 0 ] && exit 1
+
+  echo "forward-zone:" > /etc/unbound/conf.d/forwarders.conf
+  [ $? -ne 0 ] && exit 1
+  echo '  name: "."' >> /etc/unbound/conf.d/forwarders.conf
+  [ $? -ne 0 ] && exit 1
+  if [[ $enablerecursion -eq 1 ]]; then
+    echo "  forward-first: yes" >> /etc/unbound/conf.d/forwarders.conf
+    [ $? -ne 0 ] && exit 1
+  else
+    echo "  forward-addr: $DNSIP1" >> /etc/unbound/conf.d/forwarders.conf
+    [ $? -ne 0 ] && exit 1
+    echo "  forward-addr: $DNSIP2" >> /etc/unbound/conf.d/forwarders.conf
+    [ $? -ne 0 ] && exit 1
+  fi
+fi
+
+if [[ $configip -eq 1 ]]; then
+  [ $verbose -eq 1 ] && echo -e "$green[eFa]$clean - Setting IP settings"
+  mkdir -p /etc/sysconfig/network-scripts.bak
+  if [[ -f /etc/sysconfig/network-scripts.bak/ifcfg-$INTERFACE.bak ]]; then
+    rm -f /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
+    [ $? -ne 0 ] && exit 1
+    cp -f /etc/sysconfig/network-scripts.bak/ifcfg-$INTERFACE.bak /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
+    [ $? -ne 0 ] && exit 1
+  else
+    if [[ -f /etc/sysconfig/network-scripts/ifcfg-$INTERFACE ]]; then
+      cp -f /etc/sysconfig/network-scripts/ifcfg-$INTERFACE /etc/sysconfig/network-scripts.bak/ifcfg-$INTERFACE.bak
+      [ $? -ne 0 ] && exit 1
+    else
+      # no interface config, possibly nm-controlled
+      UUID=$(nmcli -t c show --active | grep $INTERFACE | awk -F':' '{print $2}')
+      if [[ -n $UUID ]]; then
+        # Found an nm-controlled interface, write back config as $INTERFACE and backup
+        nmcli c modify $UUID con-name $INTERFACE
+        [ $? -ne 0 ] && exit 1
+        cp -f /etc/sysconfig/network-scripts/ifcfg-$INTERFACE /etc/sysconfig/network-scripts.bak/ifcfg-$INTERFACE.bak
+        [ $? -ne 0 ] && exit 1
+      else
+        # No interface config found
+        exit 1
+      fi
+    fi
+  fi
+
+  if [[ -n $IPV4ADDRESS ]]; then
+    sed -i '/^BOOTPROTO=/ c\BOOTPROTO="none"' /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
+    [ $? -ne 0 ] && exit 1
+    echo "IPADDR=\"$IPV4ADDRESS\"" >> /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
+    [ $? -ne 0 ] && exit 1
+    echo "NETMASK=\"$IPV4NETMASK\"" >> /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
+    [ $? -ne 0 ] && exit 1
+    echo "GATEWAY=\"$IPV4GATEWAY\"" >> /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
+    [ $? -ne 0 ] && exit 1
+  fi
+  if [[ -n $IPV6ADDRESS ]]; then
+    sed -i '/^IPV6_AUTOCONF=/ c\IPV6_AUTOCONF="no"' /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
+    [ $? -ne 0 ] && exit 1
+    echo "IPV6ADDR=\"$IPV6ADDRESS/$IPV6MASK\"" >> /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
+    [ $? -ne 0 ] && exit 1
+    echo "IPV6_DEFAULTGW=\"$IPV6GATEWAY\"" >> /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
+    [ $? -ne 0 ] && exit 1
+  fi
+
+  echo "DNS1=\"127.0.0.1\"" >> /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
+  [ $? -ne 0 ] && exit 1
+  echo "DNS2=\"::1\"" >> /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
+  [ $? -ne 0 ] && exit 1
+fi
+
+if [[ $genhostkeys -eq 1 ]]; then
+  [ $verbose -eq 1 ] && echo -e "$green[eFa]$clean - Generating SSH Host keys"
+  rm -f /etc/ssh/ssh_host_rsa_key
+  [ $? -ne 0 ] && exit 1
+  rm -f /etc/ssh/ssh_host_dsa_key
+  [ $? -ne 0 ] && exit 1
+  rm -f /etc/ssh/ssh_host_ecdsa_key
+  [ $? -ne 0 ] && exit 1
+  rm -f /etc/ssh/ssh_host_ed25519_key
+  [ $? -ne 0 ] && exit 1
+  ssh-keygen -f /etc/ssh/ssh_host_rsa_key -N '' -t rsa
+  [ $? -ne 0 ] && exit 1
+  ssh-keygen -f /etc/ssh/ssh_host_dsa_key -N '' -t dsa
+  [ $? -ne 0 ] && exit 1
+  ssh-keygen -f /etc/ssh/ssh_host_ecdsa_key -N '' -t ecdsa
+  [ $? -ne 0 ] && exit 1
+  ssh-keygen -f /etc/ssh/ssh_host_ed25519_key -N '' -t ed25519
+  [ $? -ne 0 ] && exit 1
+
+  #[ $verbose -eq 1 ] && echo -e "$green[eFa]$clean - Generating dh key for postfix..."
+  #openssl dhparam -out /etc/postfix/ssl/dhparam.pem 2048
+  #[ $? -ne 0 ] && exit 1
+  #postconf -e "smtpd_tls_dh1024_param_file = /etc/postfix/ssl/dhparam.pem"
+  #[ $? -ne 0 ] && exit 1
+fi
+
+if [[ $configtzone -eq 1 ]]; then
+  virtplatform=`/usr/sbin/virt-what`
+
+  [ $verbose -eq 1 ] && echo -e "$green[eFa]$clean - Configure timezone"
+  if [[ "$virtplatform" != "lxc" ]]; then
+    if [[ $ISUTC -eq true || $ISUTC -eq 1 ]]; then
+      timedatectl set-local-rtc 0 >/dev/null 2>&1
+    else
+      timedatectl set-local-rtc 1 >/dev/null 2>&1
+    fi
+  fi
+  timedatectl set-timezone "$TZONE"
+  [ $? -ne 0 ] && exit 1
+  sed -i "/^;date.timezone =/ c\date.timezone = $TZONE" /etc/php.ini
+  [ $? -ne 0 ] && exit 1
+  sed -i "/^date.timezone =/ c\date.timezone = $TZONE" /etc/php.ini
+  [ $? -ne 0 ] && exit 1
+fi
+
+if [[ $configrazor -eq 1 ]]; then
+  [ $verbose -eq 1 ] && echo -e "$green[eFa]$clean - Configuring razor"
+  su postfix -s /bin/bash -c 'cd ~; razor-admin -create'
+  su postfix -s /bin/bash -c 'cd ~; razor-admin -register'
+  sed -i '/^debuglevel/ c\debuglevel             = 0' /var/spool/postfix/.razor/razor-agent.conf
+  echo 'razorhome              = /var/spool/postfix/.razor' >> /var/spool/postfix/.razor/razor-agent.conf
+  touch /var/spool/postfix/.razor/razor-agent.log
+  [ $? -ne 0 ] && exit 1
+  chown -R postfix:mtagroup /var/spool/postfix/.razor
+  [ $? -ne 0 ] && exit 1
+  chmod ug+rwx /var/spool/postfix/.razor
+  [ $? -ne 0 ] && exit 1
+  # setgid to lock in mtagroup group for new files
+  chmod ug+s /var/spool/postfix/.razor
+  [ $? -ne 0 ] && exit 1
+  chmod ug+rw /var/spool/postfix/.razor/*
+  [ $? -ne 0 ] && exit 1
+  chmod 640 /var/spool/postfix/.razor/{identity-*,razor-agent.conf}
+  [ $? -ne 0 ] && exit 1
+  chmod 664 /var/spool/postfix/.razor/razor-agent.log
+  [ $? -ne 0 ] && exit 1
+  chmod 644 /var/spool/postfix/.razor/server*
+  [ $? -ne 0 ] && exit 1
+fi
+
+if [[ $configtransport -eq 1 ]]; then
+  [ $verbose -eq 1 ] && echo -e "$green[eFa]$clean - Allow the current to receive mails"
+  if [[ -f /etc/postfix/transport.bak ]]; then
+    rm -f /etc/postfix/transport
+    [ $? -ne 0 ] && exit 1
+    cp -f /etc/postfix/transport.bak /etc/postfix/transport
+    [ $? -ne 0 ] && exit 1
+  else
+    cp -f /etc/postfix/transport /etc/postfix/transport.bak
+  fi
+
+  echo "" >> /etc/postfix/transport
+  [ $? -ne 0 ] && exit 1
+  echo "###### START eFa ADDED DOMAINS ######" >> /etc/postfix/transport
+  [ $? -ne 0 ] && exit 1
+  echo "$DOMAINNAME  smtp:[$MAILSERVER]" >> /etc/postfix/transport
+  [ $? -ne 0 ] && exit 1
+  rm -f /etc/postfix/transport.db
+  [ $? -ne 0 ] && exit 1
+  postmap /etc/postfix/transport
+  [ $? -ne 0 ] && exit 1
+
+  echo "root: $ADMINEMAIL" >> /etc/aliases
+  [ $? -ne 0 ] && exit 1
+
+  echo "root@$DOMAINNAME $ADMINEMAIL" > /etc/postfix/recipient_canonical
+  [ $? -ne 0 ] && exit 1
+  echo "root@$DOMAINNAME root@$HOSTNAME.$DOMAINNAME" > /etc/postfix/sender_canonical
+  [ $? -ne 0 ] && exit 1
+
+  postmap /etc/postfix/recipient_canonical
+  [ $? -ne 0 ] && exit 1
+  postmap /etc/postfix/sender_canonical
+  [ $? -ne 0 ] && exit 1
+
+fi
+
+if [[ $configsa -eq 1 ]]; then
+  [ $verbose -eq 1 ] && echo -e "$green[eFa]$clean - Configuring spamassassin"
+  if [[ -f /etc/MailScanner/spamassassin.conf.bak ]]; then
+    rm -f /etc/MailScanner/spamassassin.conf
+    [ $? -ne 0 ] && exit 1
+    cp -f /etc/MailScanner/spamassassin.conf.bak /etc/MailScanner/spamassassin.conf
+    [ $? -ne 0 ] && exit 1
+  else
+    cp -f /etc/MailScanner/spamassassin.conf /etc/MailScanner/spamassassin.conf.bak
+    [ $? -ne 0 ] && exit 1
+  fi
+
+  sed -i '/bayes_ignore_header/d' /etc/MailScanner/spamassassin.conf
+  [ $? -ne 0 ] && exit 1
+  echo "bayes_ignore_header X-$ORGNAME-MailScanner-eFa">>/etc/MailScanner/spamassassin.conf
+  [ $? -ne 0 ] && exit 1
+  echo "bayes_ignore_header X-$ORGNAME-MailScanner-eFa-SpamCheck">>/etc/MailScanner/spamassassin.conf
+  [ $? -ne 0 ] && exit 1
+  echo "bayes_ignore_header X-$ORGNAME-MailScanner-eFa-SpamScore">>/etc/MailScanner/spamassassin.conf
+  [ $? -ne 0 ] && exit 1
+  echo "bayes_ignore_header X-$ORGNAME-MailScanner-eFa-Information">>/etc/MailScanner/spamassassin.conf
+  [ $? -ne 0 ] && exit 1
+  sed -i "/^envelope_sender_header / c\envelope_sender_header X-$ORGNAME-MailScanner-eFa-From" /etc/MailScanner/spamassassin.conf
+  [ $? -ne 0 ] && exit 1
+  sed -i "/^header MS_FOUND_SPAMVIRUS / c\header MS_FOUND_SPAMVIRUS exists:X-$ORGNAME-MailScanner-eFa-SpamVirus-Report" /etc/MailScanner/spamassassin.conf
+  [ $? -ne 0 ] && exit 1
+
+  randompw
+  SAUSERSQLPWD=$PASSWD
+  /usr/bin/mysql -u root -p"$initpassword" -e "ALTER USER 'sa_user'@'localhost' IDENTIFIED BY '$SAUSERSQLPWD';"
+  [ $? -ne 0 ] && exit 1
+  /usr/bin/mysql -u root -p"$initpassword" -e "FLUSH PRIVILEGES;"
+  [ $? -ne 0 ] && exit 1
+  sed -i "/bayes_sql_password/ c\bayes_sql_password              $SAUSERSQLPWD" /etc/MailScanner/spamassassin.conf
+  [ $? -ne 0 ] && exit 1
+  sed -i "/user_awl_sql_password/ c\    user_awl_sql_password           $SAUSERSQLPWD" /etc/MailScanner/spamassassin.conf
+  [ $? -ne 0 ] && exit 1
+  echo "SAUSERSQLPWD:$SAUSERSQLPWD" > /etc/eFa/SA-Config
+  [ $? -ne 0 ] && exit 1
+  SAUSERSQLPWD=
+fi
+
+if [[ $configmailscanner -eq 1 ]]; then
+  [ $verbose -eq 1 ] && echo -e "$green[eFa]$clean - Configuring MailScanner"
+  if [[ -f /etc/MailScanner/MailScanner.conf.bak ]]; then
+    rm -f /etc/MailScanner/MailScanner.conf
+    [ $? -ne 0 ] && exit 1
+    cp -f /etc/MailScanner/MailScanner.conf.bak /etc/MailScanner/MailScanner.conf
+    [ $? -ne 0 ] && exit 1
+  else
+    cp -f /etc/MailScanner/MailScanner.conf /etc/MailScanner/MailScanner.conf.bak
+    [ $? -ne 0 ] && exit 1
+  fi
+  sed -i "/^%org-name% =/ c\%org-name% = $ORGNAME" /etc/MailScanner/MailScanner.conf
+  [ $? -ne 0 ] && exit 1
+  sed -i "/^%org-long-name% =/ c\%org-long-name% = $ORGNAME" /etc/MailScanner/MailScanner.conf
+  [ $? -ne 0 ] && exit 1
+  sed -i "/^%web-site% =/ c\%web-site% = https://www.efa-project.org" /etc/MailScanner/MailScanner.conf
+  [ $? -ne 0 ] && exit 1
+  sed -i "/^Use Watermarking =/ c\Use Watermarking = yes" /etc/MailScanner/MailScanner.conf
+  [ $? -ne 0 ] && exit 1
+  sed -i "/^Information Header Value =/ c\Information Header Value = Please contact $ADMINEMAIL for more information" /etc/MailScanner/MailScanner.conf
+  [ $? -ne 0 ] && exit 1
+  sed -i "/^Unscanned Header Value =/ c\Unscanned Header Value = Please contact $ADMINEMAIL for details" /etc/MailScanner/MailScanner.conf
+  [ $? -ne 0 ] && exit 1
+  sed -i "/^Hostname =/ c\Hostname = $HOSTNAME.$DOMAINNAME" /etc/MailScanner/MailScanner.conf
+  [ $? -ne 0 ] && exit 1
+  randompw
+  WATERMARK=$PASSWD
+  sed -i "/^Watermark Secret =/ c\Watermark Secret = %org-name%-$WATERMARK" /etc/MailScanner/MailScanner.conf
+  [ $? -ne 0 ] && exit 1
+fi
+
+if [[ $configmailwatch -eq 1 ]]; then
+  [ $verbose -eq 1 ] && echo -e "$green[eFa]$clean - Configuring MailWatch"
+  sed -i "/^define('MAILWATCH_FROM_ADDR'/ c\define('MAILWATCH_FROM_ADDR', 'no-reply@$HOSTNAME.$DOMAINNAME');" /var/www/html/mailscanner/conf.php
+  [ $? -ne 0 ] && exit 1
+  sed -i "/^define('TIME_ZONE',/ c\define('TIME_ZONE', '$TZONE');" /var/www/html/mailscanner/conf.php
+  [ $? -ne 0 ] && exit 1
+  sed -i "/^define('MAILWATCH_HOSTURL'/ c\define('MAILWATCH_HOSTURL', 'https:\/\/' . rtrim(gethostname()) . '\/mailscanner');" /var/www/html/mailscanner/conf.php
+  [ $? -ne 0 ] && exit 1
+
+  # Cleanup in case of a failed run
+  /usr/bin/mysql -u root -p"$initpassword" mailscanner -e "DELETE FROM users where username = '$USERNAME'" >/dev/null 2>&1
+  /usr/bin/mysql -u root -p"$initpassword" mailscanner -e "DELETE FROM whitelist where from_address= '127.0.0.1'" >/dev/null 2>&1
+  /usr/bin/mysql -u root -p"$initpassword" mailscanner -e "DELETE FROM whitelist where from_address= '::1'" >/dev/null 2>&1
+
+  /usr/bin/mysql -u root -p"$initpassword" mailscanner -e "INSERT INTO users SET username = '$USERNAME', password = '$efauserpwd', fullname = 'Administrator', type ='A'"
+  [ $? -ne 0 ] && exit 1
+  /usr/bin/mysql -u root -p"$initpassword" mailscanner -e "INSERT INTO whitelist SET to_address = 'default', to_domain = '', from_address = '127.0.0.1'"
+  [ $? -ne 0 ] && exit 1
+  /usr/bin/mysql -u root -p"$initpassword" mailscanner -e "INSERT INTO whitelist SET to_address = 'default', to_domain = '', from_address = '::1'"
+  [ $? -ne 0 ] && exit 1
+
+  randompw
+  MAILWATCHSQLPWD=$PASSWD
+  /usr/bin/mysql -u root -p"$initpassword" -e "ALTER USER 'mailwatch'@'localhost' IDENTIFIED BY '$MAILWATCHSQLPWD';"
+  [ $? -ne 0 ] && exit 1
+  /usr/bin/mysql -u root -p"$initpassword" -e "FLUSH PRIVILEGES;"
+  [ $? -ne 0 ] && exit 1
+  echo "MAILWATCHSQLPWD:$MAILWATCHSQLPWD" > /etc/eFa/MailWatch-Config
+  MAILWATCHSQLPWD=
+
+  # Upgrade database now
+  /usr/bin/mailwatch/tools/upgrade.php --skip-user-confirm /var/www/html/mailscanner/functions.php
+  # Uncommented check on failure as the upgrade gives some ingorable warnings
+  # [ $? -ne 0 ] && exit 1
+  
+  # Copy CustomAction.pm into position
+  rm -f /usr/share/MailScanner/perl/custom/CustomAction.pm
+  [ $? -ne 0 ] && exit 1
+  cp /var/eFa/lib/token/CustomAction.pm /usr/share/MailScanner/perl/custom/CustomAction.pm
+  [ $? -ne 0 ] && exit 1
+
+  # Initialize token user
+  randompw
+  EFASQLPWD=$PASSWD
+  /usr/bin/mysql -u root -p"$initpassword" -e "ALTER USER 'efa'@'localhost' IDENTIFIED BY '$EFASQLPWD';"
+  echo "EFASQLPWD:$EFASQLPWD" >> /etc/eFa/eFa-Config
+fi
+
+if [[ $configsasl -eq 1 ]]; then
+  randompw
+  RANDOMSASLPWD=$PASSWD
+  echo $RANDOMSASLPWD | saslpasswd2 -p -c /etc/sasl2/sasldb2
+  [ $? -ne 0 ] && exit 1
+  chgrp postfix /etc/sasl2/sasldb2
+  [ $? -ne 0 ] && exit 1
+fi
+
+if [[ $configsqlgrey -eq 1 ]]; then
+  randompw
+  SQLGREYSQLPWD=$PASSWD
+  /usr/bin/mysql -u root -p"$initpassword" -e "ALTER USER 'sqlgrey'@'localhost' IDENTIFIED BY '$SQLGREYSQLPWD';"
+  [ $? -ne 0 ] && exit 1
+  /usr/bin/mysql -u root -p"$initpassword" -e "FLUSH PRIVILEGES;"
+  [ $? -ne 0 ] && exit 1
+  sed -i "/^db_pass =/ c\db_pass = $SQLGREYSQLPWD" /etc/sqlgrey/sqlgrey.conf
+  [ $? -ne 0 ] && exit 1
+  echo "SQLGREYSQLPWD:$SQLGREYSQLPWD" > /etc/eFa/SQLGrey-Config
+  [ $? -ne 0 ] && exit 1
+  SQLGREYSQLPWD=
+  # Start sqlgrey to initialize db tables
+  systemctl start sqlgrey
+  [ $? -ne 0 ] && exit 1
+fi
+
+if [[ $configdmarc -eq 1 ]]; then
+  randompw
+  DMARCSQLPWD=$PASSWD
+  /usr/bin/mysql -u root -p"$initpassword" -e "ALTER USER 'opendmarc'@'localhost' IDENTIFIED BY '$DMARCSQLPWD';"
+  [ $? -ne 0 ] && exit 1
+  /usr/bin/mysql -u root -p"$initpassword" -e "FLUSH PRIVILEGES;"
+  [ $? -ne 0 ] && exit 1
+  echo "DMARCSQLPWD:$DMARCSQLPWD" > /etc/eFa/openDMARC-Config
+  [ $? -ne 0 ] && exit 1
+  DMARCSQLPWD=
+
+fi
+
+if [[ $configapache -eq 1 ]]; then
+  sed -i "/^ServerAdmin/ c\ServerAdmin $ADMINEMAIL" /etc/httpd/conf/httpd.conf
+  [ $? -ne 0 ] && exit 1
+fi
+
+if [[ $configyumcron -eq 1 ]]; then
+  sed -i "/^email_from =/ c\email_from = root@$HOSTNAME.$DOMAINNAME" /etc/dnf/automatic.conf
+  [ $? -ne 0 ] && exit 1
+  sed -i "/^email_to =/ c\email_to = $ADMINEMAIL" /etc/dnf/automatic.conf
+  [ $? -ne 0 ] && exit 1
+fi
+
+if [[ $configroot -eq 1 ]]; then
+  [ $verbose -eq 1 ] && echo -e "$green[eFa]$clean - Lockdown root"
+  passwd -l root
+  [ $? -ne 0 ] && exit 1
+fi
+
+if [[ $configcli -eq 1 ]]; then
+  [ $verbose -eq 1 ] && echo -e "$green[eFa]$clean - Creating cli user"
+
+  # Cleanup in case of failed run
+  userdel -rf $CLIUSERNAME >/dev/null 2>&1
+
+  useradd -m -d /home/$CLIUSERNAME -s /bin/bash -G wheel $CLIUSERNAME
+  [ $? -ne 0 ] && exit 1
+  echo "$CLIUSERNAME:$efaclipwd" | chpasswd -e
+  [ $? -ne 0 ] && exit 1
+
+  # Set eFa-Configure to launch
+  sed -i "1i\if ! [ -z \"\$PS1\" ]; then\n  sudo \/usr\/sbin\/eFa-Configure\nfi" /home/$CLIUSERNAME/.bashrc
+  echo "$CLIUSERNAME ALL=(ALL) NOPASSWD: /usr/sbin/eFa-Configure" >> /etc/sudoers.d/eFa-users
+fi
+
+if [[ $configcert -eq 1 ]]; then
+  [ $verbose -eq 1 ] && echo -e "$green[eFa]$clean Generating Apache and postfix self-signed cert"
+  cd /etc/pki/tls/certs
+  openssl req -newkey rsa:2048 -keyout ../private/localhost.key -nodes -x509 -days 3650 -out localhost.crt -subj "/O=$DOMAINNAME/CN=$HOSTNAME.$DOMAINNAME"
+  [ $? -ne 0 ] && exit 1
+  cp localhost.crt /etc/postfix/ssl/smtpd.pem
+  [ $? -ne 0 ] && exit 1
+  cat /etc/pki/tls/private/localhost.key >> /etc/postfix/ssl/smtpd.pem
+  [ $? -ne 0 ] && exit 1
+  # Move to post init
+  #cat /etc/postfix/ssl/dhparam.pem >> /etc/pki/tls/certs/localhost.crt
+  #[ $? -ne 0 ] && exit 1
+fi
+
+if [[ $configmysql -eq 1 ]]; then
+  randompw
+  MYSQLROOTPWD=$PASSWD
+  /usr/bin/mysqladmin -u root -p$initpassword password "$MYSQLROOTPWD"
+  [ $? -ne 0 ] && exit 1
+  echo "MYSQLROOTPWD:$MYSQLROOTPWD" > /etc/eFa/MySQL-Config
+  [ $? -ne 0 ] && exit 1
+  echo "[client]" > /root/.my.cnf
+  [ $? -ne 0 ] && exit 1
+  echo "user=root" >> /root/.my.cnf
+  [ $? -ne 0 ] && exit 1
+  echo "password=$MYSQLROOTPWD" >> /root/.my.cnf
+  [ $? -ne 0 ] && exit 1
+  MYSQLROOTPWD=
+fi
+
+if [[ $finalize -eq 1 ]]; then
+  virtplatform=`/usr/sbin/virt-what`
+  if [[ "$virtplatform" != "lxc" ]]; then
+    # Reset selinux labels
+    touch /.autorelabel
+    [ $? -ne 0 ] && exit 1
+
+    sed -i "/^SELINUX=/ c\SELINUX=enforcing" /etc/selinux/config
+  fi
+
+  rm -f /etc/issue
+  [ $? -ne 0 ] && exit 1
+
+  # Remove EFA-Init from console
+  sed -i "/^\/usr\/sbin\/eFa-Init/d" /root/.bashrc
+  [ $? -ne 0 ] && exit 1
+
+  systemctl disable eFaFirstBoot
+
+  rm -f /etc/systemd/system/eFaFirstBoot.service
+  [ $? -ne 0 ] && exit 1
+  rm -f /usr/sbin/eFaFirstBoot.sh
+  [ $? -ne 0 ] && exit 1
+
+  # Remove GUI eFaInit
+  rm -f /etc/httpd/conf.d/eFaInit.conf
+  [ $? -ne 0 ] && exit 1
+
+  cat > /var/www/html/index.html << 'EOF'
+<!DOCTYPE html>
+<html>
+    <head>
+    <title>MailWatch</title>
+    <meta http-equiv="refresh" content="0; url=/mailscanner/" />
+    </head>
+    <body>
+    </body>
+</html>
+EOF
+  [ $? -ne 0 ] && exit 1
+
+  chown root:mtagroup /etc/eFa/*
+  [ $? -ne 0 ] && exit 1
+  chmod 640 /etc/eFa/*
+  [ $? -ne 0 ] && exit 1
+
+  systemctl start mailscanner >/dev/null 2>&1
+  [ $? -ne 0 ] && exit 1
+
+  mkdir -p /var/spool/MailScanner/incoming/clamav-tmp
+  [ $? -ne 0 ] && exit 1
+  chown apache:mtagroup /var/spool/MailScanner/incoming/clamav-tmp
+  [ $? -ne 0 ] && exit 1
+  chmod 770 /var/spool/MailScanner/incoming/clamav-tmp
+  [ $? -ne 0 ] && exit 1
+
+  systemctl enable mailscanner
+  [ $? -ne 0 ] && exit 1
+  systemctl enable postfix
+  [ $? -ne 0 ] && exit 1
+  systemctl enable httpd
+  [ $? -ne 0 ] && exit 1
+  systemctl enable mariadb
+  [ $? -ne 0 ] && exit 1
+  #chkconfig saslauthd off
+  systemctl enable crond
+  [ $? -ne 0 ] && exit 1
+  systemctl start crond
+  [ $? -ne 0 ] && exit 1
+  systemctl enable clamd@scan
+  [ $? -ne 0 ] && exit 1
+  systemctl enable clamav-unofficial-sigs
+  [ $? -ne 0 ] && exit 1
+  systemctl enable clamav-unofficial-sigs.timer
+  [ $? -ne 0 ] && exit 1
+  systemctl enable sqlgrey
+  [ $? -ne 0 ] && exit 1
+  #chkconfig mailgraph-init off
+  chkconfig adcc on
+  [ $? -ne 0 ] && exit 1
+  #chkconfig webmin off
+  systemctl enable unbound
+  [ $? -ne 0 ] && exit 1
+  #chkconfig munin-node off
+  systemctl enable chronyd
+  [ $? -ne 0 ] && exit 1
+  systemctl enable sshd
+  [ $? -ne 0 ] && exit 1
+  systemctl enable php-fpm
+  [ $? -ne 0 ] && exit 1
+  systemctl enable dovecot
+  [ $? -ne 0 ] && exit 1
+  systemctl enable postfix_relay
+  [ $? -ne 0 ] && exit 1
+  systemctl enable milter_relay
+  [ $? -ne 0 ] && exit 1
+  systemctl enable opendkim
+  [ $? -ne 0 ] && exit 1
+  systemctl enable fail2ban
+  [ $? -ne 0 ] && exit 1
+
+  if [[ $configvirtual -eq 1 ]]; then
+    if [[ $virtplatform == "vmware"  ]]; then
+      func_Install-OpenVMTools
+    elif [[ $virtplatform == "kvm" ]]; then
+      func_Install-QEMUAgent
+    elif [[ $virtplatform == "hyperv" ]]; then
+      func_Install-HyperVTools
+    fi
+  fi
+
+  # Configure Firewall
+  systemctl enable firewalld
+  [ $? -ne 0 ] && exit 1
+  systemctl start firewalld
+  [ $? -ne 0 ] && exit 1
+  firewall-cmd --permanent --add-service=smtp
+  [ $? -ne 0 ] && exit 1
+  firewall-cmd --permanent --add-service=ssh
+  [ $? -ne 0 ] && exit 1
+  firewall-cmd --permanent --add-port 80/tcp
+  [ $? -ne 0 ] && exit 1
+  firewall-cmd --permanent --add-port 443/tcp
+  [ $? -ne 0 ] && exit 1
+  firewall-cmd --permanent --add-port 587/tcp
+  [ $? -ne 0 ] && exit 1
+  firewall-cmd --reload
+  [ $? -ne 0 ] && exit 1
+
+  sed -i "/CONFIGURED:/ c\CONFIGURED:YES" /etc/eFa/eFa-Config
+  [ $? -ne 0 ] && exit 1
+
+  # Schedule post init
+  echo '* * * * * root /usr/sbin/eFa-Post-Init >/dev/null 2>&1' > /etc/cron.d/efapostinit
+  chmod 0644 /etc/cron.d/efapostinit
+
+  # Clear logs
+  if [[ "$virtplatform" != "lxc" ]]; then
+    echo "" > /var/log/audit/audit.log
+  fi
+  echo "" > /var/log/messages
+  echo "" > /var/log/maillog
+  echo "" > /var/log/httpd/access_log
+  echo "" > /var/log/httpd/error_log
+  echo "" > /var/log/httpd/ssl_access_log
+  echo "" > /var/log/httpd/ssl_error_log
+  echo "" > /var/log/httpd/ssl_request_log
+  echo "" > /var/log/mariadb/mariadb.log
+  echo "" > /var/log/php-fpm/error.log
+  echo "" > /var/log/yum.log
+
+  # Remove source files
+  rm -rf /usr/src/eFa
+
+  touch /reboot.system
+
+  # Lock down GUI
+  cat > /etc/sudoers.d/mailwatch << 'EOF'
+User_Alias MAILSCANNER = apache
+Cmnd_Alias MAILSCANLINT = /usr/sbin/MailScanner --lint
+MAILSCANNER ALL= NOPASSWD: MAILSCANLINT
+EOF
+  [ $? -ne 0 ] && exit 1
+  
+  echo "apache ALL=NOPASSWD: /usr/bin/touch /reboot.system" > /etc/sudoers.d/eFa-Services
+  [ $? -ne 0 ] && exit 1
+fi
+
+exit 0

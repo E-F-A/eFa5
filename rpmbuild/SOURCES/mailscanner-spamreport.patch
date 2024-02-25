@@ -1,0 +1,12 @@
+--- v5/common/usr/share/MailScanner/reports/en/inline.sig.html	2021-01-10 05:52:07.579083984 -0500
++++ v5/common/usr/share/MailScanner/reports/en/inline.sig.html2	2022-01-18 06:14:14.442000295 -0500
+@@ -1,5 +1,6 @@
+ <br />-- 
+ <br />This message has been scanned for viruses and
+-<br />dangerous content by
+-<a href="http://www.mailscanner.info/"><b>MailScanner</b></a>, and is
+-<br />believed to be clean.
++<br />dangerous content and is believed to be clean.
++
++If this message is spam, you can report in the next 3 days
++by clicking http://$hostname/mailscanner/eFa-learn.php?mid=$id&r=$token

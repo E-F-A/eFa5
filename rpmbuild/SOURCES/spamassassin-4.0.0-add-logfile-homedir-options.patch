@@ -1,0 +1,35 @@
+diff --color -Nur Mail-SpamAssassin-4.0.0.orig/lib/Mail/SpamAssassin/Plugin/Razor2.pm Mail-SpamAssassin-4.0.0/lib/Mail/SpamAssassin/Plugin/Razor2.pm
+--- Mail-SpamAssassin-4.0.0.orig/lib/Mail/SpamAssassin/Plugin/Razor2.pm	2022-12-13 22:03:20.000000000 -0800
++++ Mail-SpamAssassin-4.0.0/lib/Mail/SpamAssassin/Plugin/Razor2.pm	2022-12-21 12:14:41.978518595 -0800
+@@ -185,7 +185,9 @@
+       $rc->{opt} = {
+ 	debug => (would_log('dbg', $debug) > 1),
+ 	foreground => 1,
+-	config => $self->{main}->{conf}->{razor_config}
++        config => $self->{main}->{conf}->{razor_config},
++        logfile => $self->{main}->{razor_log_file},
++        razorhome => $self->{main}->{razor_home_dir}
+       };
+       # no facility prefix on this die
+       $rc->do_conf() or die "$debug: " . $rc->errstr;
+diff --color -Nur Mail-SpamAssassin-4.0.0.orig/spamd/spamd.raw Mail-SpamAssassin-4.0.0/spamd/spamd.raw
+--- Mail-SpamAssassin-4.0.0.orig/spamd/spamd.raw	2022-12-13 22:03:27.000000000 -0800
++++ Mail-SpamAssassin-4.0.0/spamd/spamd.raw	2022-12-21 12:13:38.426637129 -0800
+@@ -378,6 +378,8 @@
+ # Parse the command line
+ Getopt::Long::Configure("bundling");
+ GetOptions(
++  'razor-home-dir=s'         => \$opt{'razor_home_dir'},
++  'razor-log-file=s'         => \$opt{'razor_log_file'},
+   'allow-tell'               => \$opt{'tell'},
+   'allowed-ips|A=s'          => \@{ $opt{'allowed-ip'} },
+   'configpath|C=s'           => \$opt{'configpath'},
+@@ -1195,6 +1197,8 @@
+ 
+ my $spamtest = Mail::SpamAssassin->new(
+   {
++    razor_home_dir       => ( $opt{'razor_home_dir'} || 0),
++    razor_log_file       => ( $opt{'razor_log_file'} || 0),
+     dont_copy_prefs      => $dontcopy,
+     rules_filename       => ( $opt{'configpath'} || 0 ),
+     site_rules_filename  => ( $opt{'siteconfigpath'} || 0 ),

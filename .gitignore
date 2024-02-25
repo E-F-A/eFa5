@@ -1,0 +1,15 @@
+*\.swp
+*~
+/rpmbuild/BUILD/*
+!/rpmbuild/BUILD
+/rpmbuild/RPMS/*
+!/rpmbuild/RPMS
+/rpmbuild/SRPMS/*
+!/rpmbuild/SRPMS
+/rpmbuild/BUILDROOT
+/rpmbuild/SOURCES/*.tar.gz
+/rpmbuild/SOURCES/*.tar.Z
+/rpmbuild/SOURCES/*.tar.bz2
+/rpmbuild/SOURCES/*.tgz
+/rpmbuild/SOURCES/*.png
+/rpmbuild/SOURCES/*.ico
