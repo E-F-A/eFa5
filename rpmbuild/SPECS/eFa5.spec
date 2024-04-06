@@ -438,7 +438,6 @@ mv eFa/eFa-Backup.cron $RPM_BUILD_ROOT%{_sysconfdir}/cron.daily
 mv eFa/eFa-logrotate $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d
 mv eFa/mysqltuner.pl $RPM_BUILD_ROOT%{_sbindir}
 mkdir -p $RPM_BUILD_ROOT%{_usrsrc}/eFa/mariadb
-mv eFa/schema.mysql $RPM_BUILD_ROOT%{_usrsrc}/eFa/mariadb
 # Move update scripts into position
 mv updates $RPM_BUILD_ROOT%{_usrsrc}/eFa
 
