@@ -434,8 +434,6 @@ if [[ $startmariadb -eq 1 ]]; then
   password="eFaPr0j3ct"
   /usr/bin/mysqladmin -u root password "$password"
 
-  /usr/bin/mysqladmin -u root -p"$password" -h localhost.localdomain password "$password"
-  
   /usr/bin/mysql -u root -p"$password" -e "DROP USER '';" >/dev/null 2>&1
 
   /usr/bin/mysql -u root -p"$password" -e "DROP USER 'root';" >/dev/null 2>&1
@@ -531,7 +529,7 @@ if [[ $configip -eq 1 ]]; then
   [ $verbose -eq 1 ] && echo -e "$green[eFa]$clean - Setting IP settings"
   
   if [[ -n $IPV4ADDRESS ]]; then
-    $NAME=$(nmcli -t c show --active | grep ":$INTERFACE" | grep "802-3-ethernet" | awk -F':' '{print $1}')
+    NAME=$(nmcli -t c show --active | grep ":$INTERFACE" | grep "802-3-ethernet" | awk -F':' '{print $1}')
 
     if [[ -z $NAME ]]; then
       # No active interface found for device

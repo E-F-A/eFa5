@@ -46,7 +46,7 @@ function func_getipsettings(){
         INTERFACE=$interf
     fi
 
-    $NAME=$(nmcli -t c show --active | grep ":$INTERFACE" | grep "802-3-ethernet" | awk -F':' '{print $1}')
+    NAME=$(nmcli -t c show --active | grep ":$INTERFACE" | grep "802-3-ethernet" | awk -F':' '{print $1}')
 
     IPV4METHOD="`nmcli connection show $NAME | grep ipv4.method | awk '{print $2}'`"
     IPV6METHOD="`nmcli connection show $NAME | grep ipv6.method | awk '{print $2}'`"

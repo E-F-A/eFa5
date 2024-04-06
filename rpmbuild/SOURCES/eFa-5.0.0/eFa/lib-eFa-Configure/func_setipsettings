@@ -41,7 +41,7 @@ func_setipsettings(){
     echo "  forward-first: yes" >> /etc/unbound/conf.d/forwarders.conf
   fi
 
-  $NAME=$(nmcli -t c show --active | grep ":$INTERFACE" | grep "802-3-ethernet" | awk -F':' '{print $1}')
+  NAME=$(nmcli -t c show --active | grep ":$INTERFACE" | grep "802-3-ethernet" | awk -F':' '{print $1}')
 
   # Set ip settings
   if [[ "$IPV4METHOD" == "auto" ]]; then
