@@ -209,7 +209,7 @@ class eFaInitController extends AbstractController
             break;
             case "ipv4netmask":
                 $options = array(
-                    'varLabel'    => 'Please enter a valid IPv4 netmask',
+                    'varLabel'    => 'Please enter a valid IPv4 netmask length',
                     'varProperty' => 'IPv4netmask',
                     'varData'     => $session->get($slug),
                 );
@@ -217,7 +217,7 @@ class eFaInitController extends AbstractController
                 if ($options['varData'] === '' || $options['varData'] === null) {
                     try {
                         $interface = $session->get('interface');
-                        $process = Process::fromShellCommandline("ip add show dev $interface | grep inet\  | grep -v inet\ 127. | awk '{print $2}' | xargs ipcalc -m | awk -F'=' {'print $2'}");
+                        $process = Process::fromShellCommandline("ip add show dev $interface | grep inet\  | grep -v inet\ 127. | awk '{print $2}' | awk -F'/' '{print $2}'");
                         $process->mustRun();
                         $options['varData'] = $process->getOutput();
                     } catch (ProcessFailedException $exception) {

@@ -28,10 +28,6 @@ func_setipsettings(){
     sed -i '/^\t# do-ip6:/ c\\tdo-ip6: no' /etc/unbound/unbound.conf
   fi
 
-  if [[ -z $(grep "^dns=none" /etc/NetworkManager/NetworkManager.conf) ]]; then
-    sed -i "/^\[main\]$/ a\dns=none" /etc/NetworkManager/NetworkManager.conf
-  fi
-
   # Write resolv file
   # new unbound stuff... 
   if [[ "$RECURSIVEDNS" == "DISABLED" ]]; then
@@ -45,70 +41,41 @@ func_setipsettings(){
     echo "  forward-first: yes" >> /etc/unbound/conf.d/forwarders.conf
   fi
 
-  # Set ip settings
-  mkdir -p /etc/sysconfig/network-scripts.bak
-  if [[ -f /etc/sysconfig/network-scripts.bak/ifcfg-$INTERFACE.bak ]]; then
-    rm -f /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
-    cp -f /etc/sysconfig/network-scripts.bak/ifcfg-$INTERFACE.bak /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
-  else
-    cp -f /etc/sysconfig/network-scripts/ifcfg-$INTERFACE /etc/sysconfig/network-scripts.bak/ifcfg-$INTERFACE.bak
-  fi
+  $NAME=$(nmcli -t c show --active | grep ":$INTERFACE" | grep "802-3-ethernet" | awk -F':' '{print $1}')
 
-  if [[ "$BOOTPROTO" == "dhcp" ]]; then
-    sed -i "/^BOOTPROTO/ c\BOOTPROTO=dhcp" /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
-    sed -i "/^IPADDR/d" /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
-    sed -i "/^NETMASK/d" /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
-    sed -i "/^GATEWAY/d" /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
+  # Set ip settings
+  if [[ "$IPV4METHOD" == "auto" ]]; then
+    nmcli connection modify $NAME ipv4.method "auto" ipv4.address "" ipv4.gateway ""
     IP4=""
     NM4=""
     GW4=""
   else
-    sed -i "/^BOOTPROTO/ c\BOOTPROTO=none" /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
+    nmcli connection modify $NAME ipv4.method "manual"
   fi
   
-  if [[ "$IPV6AUTOCONF" == "yes" ]]; then
-    sed -i "/^IPV6_AUTOCONF/ c\IPV6_AUTOCONF=yes" /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
-    sed -i "/^IPV6ADDR/d" /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
-    sed -i "/^IPV6_DEFAULTGW/d" /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
+  if [[ "$IPV6METHOD" == "auto" ]]; then
+    nmcli connection modify $NAME ipv6.method "auto" ipv6.address "" ipv6.gateway ""
     IP6=""
     PF6=""
     GW6=""
-  else
-    sed -i "/^IPV6_AUTOCONF/ c\IPV6_AUTOCONF=no" /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
+  elif [[ $IPV6METHOD == "ignore" ]]; then
+    nmcli connection modify $NAME ipv6.method "ignore" ipv6.address "" ipv6.gateway ""
+    IP6=""
+    PF6=""
+    GW6=""
+  else 
+    nmcli connection modify $NAME ipv6.method "manual"
   fi
 
   if [[ -n $IP4 ]]; then
-    if [[ -z $(grep ^IPADDR /etc/sysconfig/network-scripts/ifcfg-$INTERFACE) ]]; then
-      echo "IPADDR=\"$IP4\"" >> /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
-    else
-      sed -i "/^IPADDR=/ c\IPADDR=\"$IP4\"" /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
-    fi
-    if [[ -z $(grep ^NETMASK /etc/sysconfig/network-scripts/ifcfg-$INTERFACE) ]]; then
-      echo "NETMASK=\"$NM4\"" >> /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
-    else
-      sed -i "/^NETMASK=/ c\NETMASK=\"$NM4\"" /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
-    fi
-    if [[ -z $(grep ^GATEWAY /etc/sysconfig/network-scripts/ifcfg-$INTERFACE) ]]; then
-      echo "GATEWAY=\"$GW4\"" >> /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
-    else
-      sed -i "/^GATEWAY=/ c\GATEWAY=\"$GW4\"" /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
-    fi
-  fi
-  if [[ -n $IP6 ]]; then
-    sed -i '/^IPV6_AUTOCONF=/ c\IPV6_AUTOCONF="no"' /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
-    if [[ -z $(grep ^IPV6ADDR /etc/sysconfig/network-scripts/ifcfg-$INTERFACE) ]]; then
-      echo "IPV6ADDR=\"$IP6/$PF6\"" >> /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
-    else
-      sed -i "/^IPV6ADDR=/ c\IPV6ADDR=\"$IP6/$PF6\"" /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
-    fi
-    if [[ -z $(grep ^IPV6_DEFAULTGW /etc/sysconfig/network-scripts/ifcfg-$INTERFACE) ]]; then
-      echo "IPV6_DEFAULTGW=\"$GW6\"" >> /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
-    else
-      sed -i "/^IPV6_DEFAULTGW=/ c\IPV6_DEFAULTGW=\"$GW6\"" /etc/sysconfig/network-scripts/ifcfg-$INTERFACE
-    fi
+    nmcli connection modify $NAME ipv4.address "$IP4/$NM4" ipv4.gateway "$GW4"
   fi
 
-  # Write change to EFA-Config
+  if [[ -n $IP6 ]]; then
+    nmcli connection modify $NAME ipv6.address "$IP6/$PF6" ipv6.gateway "$GW6"
+  fi
+
+  # Write change to eFa-Config
   sed -i "/^IPV4ADDRESS:/ c\IPV4ADDRESS:$IP4" /etc/eFa/eFa-Config
   sed -i "/^IPV4NETMASK:/ c\IPV4NETMASK:$NM4" /etc/eFa/eFa-Config
   sed -i "/^IPV4GATEWAY:/ c\IPV4GATEWAY:$GW4" /etc/eFa/eFa-Config

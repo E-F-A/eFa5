@@ -155,13 +155,9 @@ class eFaInitTask
      * @Assert\NotBlank(
      *    groups={"IPv4netmask"}
      * )
-     * @Assert\Length(
-     *    min     = 7,
-     *    max     = 15,
-     *    groups={"IPv4netmask"}
-     * )
-     * @Assert\Regex(
-     *    "/^(((255\.){3}(255|254|252|248|240|224|192|128|0+))|((255\.){2}(255|254|252|248|240|224|192|128|0+)\.0)|((255\.)(255|254|252|248|240|224|192|128|0+)(\.0+){2})|((255|254|252|248|240|224|192|128|0+)(\.0+){3}))$/",
+     * @Assert\Range(
+     *    min = 1,
+     *    max = 32,
      *    groups={"IPv4netmask"}
      * )
      */
@@ -238,8 +234,8 @@ class eFaInitTask
      *    groups={"IPv6prefix"}
      * )
      * @Assert\Range(
-     *    min = 8,
-     *    max = 127,
+     *    min = 1,
+     *    max = 128,
      *    groups={"IPv6prefix"}
      * )
      */

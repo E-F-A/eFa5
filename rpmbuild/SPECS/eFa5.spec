@@ -17,7 +17,7 @@
 # along with this SPEC. If not, see <http://www.gnu.org/licenses/>.
 #-----------------------------------------------------------------------------#
 
-%define releasenum 3
+%define releasenum 4
 
 Name:      eFa
 Summary:   eFa Maintenance rpm
@@ -176,7 +176,7 @@ Requires: perl-Time-HiRes >= 4:1.9764-462
     #                                            # appstream # MailScanner, spamassassin
 Requires: perl-Time-Local >= 2:1.300-7
     #                                            # appstream # MailScanner, spamassassin
-Requires: MailScanner >= 5.5.1-4
+Requires: MailScanner >= 5.5.1-5
     # MailScanner                                # eFa     # MailScanner
 Requires: p7zip >= 16.02-21
     # p7zip                                      # epel    # MailScanner
@@ -481,6 +481,7 @@ if [ "$1" = "1" ]; then
         /bin/sh %{_usrsrc}/eFa/razor-config-5.0.0.sh
         /bin/sh %{_usrsrc}/eFa/dcc-config-5.0.0.sh
         /bin/sh %{_usrsrc}/eFa/unbound-config-5.0.0.sh
+        /bin/sh %{_usrsrc}/eFa/opendkim-config-5.0.0.sh
         /bin/sh %{_usrsrc}/eFa/yum-cron-config-5.0.0.sh
         /bin/sh %{_usrsrc}/eFa/service-config-5.0.0.sh
         /bin/sh %{_usrsrc}/eFa/eFa-config-5.0.0.sh
@@ -535,6 +536,9 @@ rm -rf $RPM_BUILD_ROOT
 %attr(0644, root, root) %{_sysconfdir}/logrotate.d/eFa-logrotate
 
 %changelog
+* Thu Mar 21 2024 eFa Project <shawniverson@efa-project.org> - 5.0.0-4
+- Update MailScanner
+
 * Sun Feb 25 2024 eFa Project <shawniverson@efa-project.org> - 5.0.0-3
 - Update postfix
 

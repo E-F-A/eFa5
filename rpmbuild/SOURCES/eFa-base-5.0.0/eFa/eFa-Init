@@ -168,8 +168,8 @@ function func_ask-ipv6mask() {
   nmcheck=1
   while [ $nmcheck != 0 ]
    do
-    # Between 1 and 128, power of 2
-    if [[ $IPV6MASK =~ ^[0-9]{1,3}$ && $IPV6MASK -ge 1 && $IPV6MASK -le 128 && $(( $IPV6MASK & ($IPV6MASK - 1) )) -eq 0 ]]; then
+    # Between 1 and 128
+    if [[ $IPV6MASK =~ ^[0-9]{1,3}$ && $IPV6MASK -ge 1 && $IPV6MASK -le 128 ]]; then
        nmcheck=0
      else
        echo -e "       $red ERROR: The ipv6 MASK $IPV6MASK seems to be invalid"
@@ -188,17 +188,17 @@ function func_ask-ipv4netmask() {
 
   # Display current netmask and ask for new, then validate the netmask
   #CIPV4NETMASK=`ifconfig $INTERFACE | grep inet\ | awk '{print $4}'`
-  CIPV4NETMASK=$(ip add show dev $INTERFACE | grep inet\  | grep -v inet\ 127. | awk '{print $2}' | xargs ipcalc -m | awk -F'=' {'print $2'})
+  CIPV4NETMASK=$(ip add show dev $INTERFACE | grep inet\  | grep -v inet\ 127. | awk '{print $2}' | awk -F'/' '{print $2}')
   echo -e ""
-  echo -e "$green[eFa]$clean Your current netmask is: $CIPV4NETMASK"
+  echo -e "$green[eFa]$clean Your current netmask length is: $CIPV4NETMASK"
   echo -e ""
-  echo -e "$green[eFa]$clean Please enter the IP v4 NETMASK"
+  echo -e "$green[eFa]$clean Please enter the IP v4 NETMASK length"
   echo -e -n "$green[eFa]$clean : "
   read -i "$CIPV4NETMASK" -e IPV4NETMASK
   nmcheck=1
   while [ $nmcheck != 0 ]
    do
-    if checkip $IPV4NETMASK
+    if [[ $IPV4NETMASK -ge 1 && $IPV4NETMASK -le 32 ]]
      then
        nmcheck=0
      else
