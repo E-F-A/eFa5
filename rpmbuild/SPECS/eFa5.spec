@@ -527,7 +527,6 @@ rm -rf $RPM_BUILD_ROOT
 %attr(0755, root, root) %{_localstatedir}/eFa/lib/selinux/eFaqemu.te
 %attr(0755, root, root) %{_localstatedir}/eFa/lib/selinux/eFa.fc
 %attr(0755, root, root) %{_localstatedir}/eFa/lib/selinux/eFa9.te
-%attr(0755, root, root) %{_localstatedir}/eFa/lib/token/efatokens.sql
 %attr(0644, root, root) %{_localstatedir}/eFa/lib/token/CustomAction.pm
 %attr(0644, root, root) %{_localstatedir}/www/html/mailscanner/eFa-release.php
 %attr(0644, root, root) %{_localstatedir}/www/html/mailscanner/eFa-learn.php
@@ -536,8 +535,8 @@ rm -rf $RPM_BUILD_ROOT
 %attr(0644, root, root) %{_sysconfdir}/logrotate.d/eFa-logrotate
 
 %changelog
-* Thu Mar 21 2024 eFa Project <shawniverson@efa-project.org> - 5.0.0-4
-- Update MailScanner
+* Sat Apr 06 2024 eFa Project <shawniverson@efa-project.org> - 5.0.0-4
+- Update MailScanner, MailWatch, use NetworkManager, misc fixes
 
 * Sun Feb 25 2024 eFa Project <shawniverson@efa-project.org> - 5.0.0-3
 - Update postfix
