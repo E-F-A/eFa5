@@ -426,10 +426,6 @@ if [[ $startmariadb -eq 1 ]]; then
   systemctl start mariadb
   [ $? -ne 0 ] && exit 1
 
-  # Make sure temp is present for mariadb
-  mkdir /var/lib/mysql/temp && chown mysql:mysql /var/lib/mysql/temp
-  sed -i "/^\[mysqld\]/ a\tmpdir = /var/lib/mysql/temp" /etc/my.cnf.d/mariadb-server.cnf
-
   # remove default security flaws from MySQL.
   password="eFaPr0j3ct"
   /usr/bin/mysqladmin -u root password "$password"
@@ -544,8 +540,9 @@ if [[ $configip -eq 1 ]]; then
 
   nmcli con mod $NAME ipv4.dns "127.0.0.1" ipv6.dns "::1"
 
-  nmcli con down $NAME
-  nmcli con up $NAME
+  # Don't bounce interface, will interrupt client on ip change
+  #nmcli con down $NAME
+  #nmcli con up $NAME
 
 fi
 

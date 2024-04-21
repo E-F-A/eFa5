@@ -24,5 +24,5 @@
 source /usr/src/eFa/eFa-settings.inc
 #-----------------------------------------------------------------------------#
 
-sed -i "/^Socket\s/ c\Socket inet:8891@localhost" /etc/opendkim.conf
+sed -i "/^Socket\s/ c\Socket inet:8893@127.0.0.1" /etc/opendmarc.conf
 

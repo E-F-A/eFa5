@@ -17,7 +17,7 @@
 # along with this SPEC. If not, see <http://www.gnu.org/licenses/>.
 #-----------------------------------------------------------------------------#
 
-%define releasenum 4
+%define releasenum 5
 
 Name:      eFa
 Summary:   eFa Maintenance rpm
@@ -480,6 +480,7 @@ if [ "$1" = "1" ]; then
         /bin/sh %{_usrsrc}/eFa/dcc-config-5.0.0.sh
         /bin/sh %{_usrsrc}/eFa/unbound-config-5.0.0.sh
         /bin/sh %{_usrsrc}/eFa/opendkim-config-5.0.0.sh
+        /bin/sh %{_usrsrc}/eFa/opendmarc-config-5.0.0.sh
         /bin/sh %{_usrsrc}/eFa/yum-cron-config-5.0.0.sh
         /bin/sh %{_usrsrc}/eFa/service-config-5.0.0.sh
         /bin/sh %{_usrsrc}/eFa/eFa-config-5.0.0.sh
@@ -533,6 +534,9 @@ rm -rf $RPM_BUILD_ROOT
 %attr(0644, root, root) %{_sysconfdir}/logrotate.d/eFa-logrotate
 
 %changelog
+* Sat Apr 13 2024 eFa Project <shawniverson@efa-project.org> - 5.0.0-5
+- Fixes for opendkim and operndmarc socket configuration
+
 * Sat Apr 06 2024 eFa Project <shawniverson@efa-project.org> - 5.0.0-4
 - Update MailScanner, MailWatch, use NetworkManager, misc fixes
 
