@@ -53,21 +53,21 @@
 %define real_name Mail-SpamAssassin
 %{!?perl_vendorlib: %define perl_vendorlib %(eval "`%{__perl} -V:installvendorlib`"; echo $installvendorlib)}
 
-%global saversion 4.000000
+%global saversion 4.000001
 #%%global prerev rc2
 
 %undefine _disable_source_fetch
 
 Summary: Spam filter for email which can be invoked from mail delivery agents
 Name: spamassassin
-Version: 4.0.0
+Version: 4.0.1
 #Release: 0.8.%%{prerev}%%{?dist}
-Release: 3.eFa%{?dist}
-License: ASL 2.0
+Release: 2.eFa%{?dist}
+License: Apache-2.0
 URL: https://spamassassin.apache.org/
 Source0: https://www.apache.org/dist/%{name}/source/%{real_name}-%{version}.tar.bz2
 #Source0: %%{real_name}-%%{version}-%%{prerev}.tar.bz2
-Source1: https://www.apache.org/dist/%{name}/source/%{real_name}-rules-%{version}.r1905950.tgz
+Source1: https://www.apache.org/dist/%{name}/source/%{real_name}-rules-%{version}.r1916528.tgz
 #Source1: %%{real_name}-rules-%%{version}.%%{prerev}.tgz
 Source2: redhat_local.cf
 Source3: spamassassin-default.rc
@@ -87,6 +87,11 @@ Source15: spamassassin.sysconfig.el
 Source16: sa-update.service
 Source17: sa-update.timer
 
+# GPG Keys and source signatures
+Source100: https://www.apache.org/dist/%{name}/source/%{real_name}-%{version}.tar.bz2.asc
+Source101: https://www.apache.org/dist/%{name}/source/%{real_name}-rules-%{version}.r1916528.tgz.asc
+Source102: https://www.apache.org/dist/spamassassin/KEYS
+
 # Patches 0-99 are RH specific
 # https://bugzilla.redhat.com/show_bug.cgi?id=1055593
 # Switch to using gnupg2 instead of gnupg1
@@ -101,6 +106,7 @@ Requires(post): diffutils
 
 BuildRequires: make
 BuildRequires: gcc
+BuildRequires: gnupg2
 BuildRequires: perl-interpreter >= 2:5.8.0
 BuildRequires: perl-generators
 BuildRequires: perl(Net::DNS)
@@ -160,8 +166,8 @@ BuildRequires: perl-Razor-Agent
 Requires: perl(IO::Socket::SSL)
 BuildRequires: perl(IO::Socket::SSL)
 # Needed for IPv6
-Requires: perl(IO::Socket::INET6)
-BuildRequires: perl(IO::Socket::INET6)
+Requires: perl(IO::Socket::IP)
+BuildRequires: perl(IO::Socket::IP)
 %endif
 %if %{perl_devel}
 BuildRequires: perl-devel
@@ -207,10 +213,13 @@ To filter spam for all users, add that line to /etc/procmailrc
 (creating if necessary).
 
 %prep
+%{gpgverify} --keyring='%{SOURCE102}' --signature='%{SOURCE100}' --data='%{SOURCE0}'
+%{gpgverify} --keyring='%{SOURCE102}' --signature='%{SOURCE101}' --data='%{SOURCE1}'
 %setup -q -n Mail-SpamAssassin-%{version}
 # Patches 0-99 are RH specific
-%patch0 -p1
-%patch1 -p1
+# runnning twice, possible autosetup?
+#%patch 0 -p1
+%patch 1 -p1
 # end of patches
 
 echo "RHEL=%{?rhel} FEDORA=%{?fedora}"
@@ -391,6 +400,34 @@ exit 0
 %endif
 
 %changelog
+* Sun Apr 21 2024 Shawn Iverson <shawniverson@efa-project.org> - 4.0.1-2
+- Build for eFa
+
+* Sat Apr 13 2024 Kevin Fenzi <kevin@scrye.com> - 4.0.1-2
+- Fix saversion for 4.0.1
+
+* Sat Apr 06 2024 Kevin Fenzi <kevin@scrye.com> - 4.0.1-1
+- Update to 4.0.1. Fixes rhbz#2272189
+
+* Sat Jan 27 2024 Fedora Release Engineering <releng@fedoraproject.org> - 4.0.0-9
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_40_Mass_Rebuild
+
+* Tue Dec 19 2023 Florian Weimer <fweimer@redhat.com> - 4.0.0-8
+- Bring back still needed part of configure C compatibility fix
+
+* Thu Sep 21 2023 Martin Osvald <mosvald@redhat.com> - 4.0.0-7
+- SPDX migration
+
+* Sat Jul 22 2023 Fedora Release Engineering <releng@fedoraproject.org> - 4.0.0-6
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_39_Mass_Rebuild
+
+* Tue Jun 27 2023 Jitka Plesnikova <jplesnik@redhat.com> - 4.0.0-5
+- Replace IO::Socket::INET6 by recommended IO::Socket::IP. Fixes rhbz#2218100
+
+
+* Sun Apr 02 2023 Todd Zullinger <tmz@pobox.com> - 4.0.0-4
+- Verify upstream source signatures
+
 * Sat Jan 21 2023 Fedora Release Engineering <releng@fedoraproject.org> - 4.0.0-3
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_38_Mass_Rebuild
 

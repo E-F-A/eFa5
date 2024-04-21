@@ -282,7 +282,7 @@ Requires: sqlgreywebinterface >= 1:1.1.9-5
     # sqlgreywebinterrface                       # eFa       # mailwatch
 Requires:  MailWatch >= 1:1.2.18-5
     # MailWatch                                  # eFa     # MailWatch Frontend
-Requires:  spamassassin >= 4.0.0-3
+Requires:  spamassassin >= 4.0.1-2
     # spamassassin                               # eFa     # MailScanner
 Requires:  clamav-unofficial-sigs >= 1:7.2.5.1-1
     # clamav-unofficial-sigs                     # eFa     # clamav
@@ -535,7 +535,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %changelog
 * Sat Apr 13 2024 eFa Project <shawniverson@efa-project.org> - 5.0.0-5
-- Fixes for opendkim and operndmarc socket configuration
+- Fixes for opendkim and operndmarc socket configuration, spamassassin 4.0.1
 
 * Sat Apr 06 2024 eFa Project <shawniverson@efa-project.org> - 5.0.0-4
 - Update MailScanner, MailWatch, use NetworkManager, misc fixes
