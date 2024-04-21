@@ -983,7 +983,7 @@ EOF
   systemctl enable sqlgrey
   [ $? -ne 0 ] && exit 1
   #chkconfig mailgraph-init off
-  chkconfig adcc on
+  systemctl enable adcc
   [ $? -ne 0 ] && exit 1
   #chkconfig webmin off
   systemctl enable unbound

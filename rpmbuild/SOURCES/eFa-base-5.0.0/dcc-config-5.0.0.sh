@@ -50,7 +50,27 @@ sed -i '/^DCCIFD_LOGDIR=/ c\DCCIFD_LOGDIR="/var/dcc/log"' /var/dcc/dcc_conf
 chown postfix:mtagroup /var/dcc
 
 # init for dcc
-cp /var/dcc/libexec/rcDCC /etc/rc.d/init.d/adcc
+#cp /var/dcc/libexec/rcDCC /etc/rc.d/init.d/adcc
+
+# systemd for dcc
+cat > /lib/systemd/system/adcc.service << 'EOF'
+[Unit]
+Description=DCC https://www.rhyolite.com/dcc
+After=network.target
+
+[Service]
+Type=forking
+Restart=no
+TimeoutSec=1min
+IgnoreSIGPIPE=no
+KillMode=process
+RemainAfterExit=yes
+ExecStart=/var/dcc/libexec/rcDCC start
+ExecStop=/var/dcc/libexec/rcDCC stop
+
+[Install]
+WantedBy=multi-user.target
+EOF
 
 sed -i "s/#loadplugin Mail::SpamAssassin::Plugin::DCC/loadplugin Mail::SpamAssassin::Plugin::DCC/g" /etc/mail/spamassassin/v310.pre
 

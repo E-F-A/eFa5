@@ -44,7 +44,7 @@ systemctl disable crond
 systemctl disable clamd@scan
 systemctl disable clamav-unofficial-sigs.service
 systemctl disable clamav-unofficial-sigs.timer
-chkconfig adcc off
+systemctl disable adcc
 systemctl disable sqlgrey
 systemctl disable unbound
 systemctl disable chronyd
