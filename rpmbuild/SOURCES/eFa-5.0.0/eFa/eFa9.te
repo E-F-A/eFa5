@@ -398,7 +398,7 @@ allow spamd_update_t shadow_t:file read;
 allow spamd_update_t spamd_var_lib_t:file { execute map };
 allow spamd_update_t system_cronjob_tmp_t:file write;
 allow spamd_update_t admin_home_t:dir { add_name write create };
-allow spamd_update_t httpd_sys_content_t:file { getattr read open };
+allow spamd_update_t httpd_sys_content_t:file { getattr read open map };
 
 
 #============= mscan_t ==============
@@ -434,7 +434,7 @@ allow mscan_t spamd_compiled_t:file { open read getattr ioctl execute };
 allow mscan_t sysfs_t:dir { read };
 allow mscan_t rpm_exec_t:file { getattr };
 allow mscan_t ldconfig_exec_t:file { getattr execute };
-allow mscan_t httpd_sys_content_t:file { getattr read open };
+allow mscan_t httpd_sys_content_t:file { getattr read open map };
 allow mscan_t self:capability dac_override;
 allow mscan_t mysqld_var_run_t:sock_file { write };
 allow mscan_t mscan_t:process { setsched };
