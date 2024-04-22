@@ -132,13 +132,13 @@ require {
     class tcp_socket { name_connect getattr ioctl };
     class capability { kill setuid setgid chown dac_override dac_read_search sys_resource fsetid fowner audit_write net_raw };
     class netlink_audit_socket { create write nlmsg_relay read };
-    class process setrlimit;
     class service enable;
     class filesystem getattr;
     class capability2 mac_admin;
     class fifo_file { getattr ioctl write open };
     class dbus { send_msg };
-    class process { setsched };
+    class process { setrlimit setsched setpgid };
+    class passwd { rootok };
 }
 
 # Configuration security hardening
@@ -416,7 +416,7 @@ allow mscan_t tmpfs_t:filesystem getattr;
 allow mscan_t mscan_etc_t:lnk_file read;
 allow mscan_t mysqld_db_t:dir search;
 allow mscan_t cdcc_exec_t:file { getattr execute open read execute_no_trans map };
-allow mscan_t dcc_client_exec_t:file { getattr execute open read execute_no_trans };
+allow mscan_t dcc_client_exec_t:file { getattr execute open read execute_no_trans map };
 allow mscan_t dcc_client_map_t:file { getattr read write open lock map };
 allow mscan_t dcc_var_t:dir { getattr search write add_name remove_name };
 allow mscan_t dcc_var_t:file { getattr read write create open lock rename unlink };
@@ -428,12 +428,12 @@ allow mscan_t self:capability { fowner fsetid };
 allow mscan_t initrc_t:unix_stream_socket connectto;
 allow mscan_t efasql_etc_t:file { read open ioctl getattr };
 allow mscan_t mailwatchsql_etc_t:file { read open ioctl getattr };
-allow mscan_t spamd_compiled_t:dir { search };
+allow mscan_t spamd_compiled_t:dir { search getattr };
 allow mscan_t spamd_compiled_t:file { open read getattr ioctl execute };
 allow mscan_t sysfs_t:dir { read };
 allow mscan_t rpm_exec_t:file { getattr };
 allow mscan_t ldconfig_exec_t:file { getattr execute };
-allow mscan_t httpd_sys_content_t:file { getattr read };
+allow mscan_t httpd_sys_content_t:file { getattr read open };
 allow mscan_t self:capability dac_override;
 allow mscan_t mysqld_var_run_t:sock_file { write };
 allow mscan_t mscan_t:process { setsched };
@@ -461,6 +461,14 @@ allow systemd_logind_t httpd_sys_script_t:dbus { send_msg };
 
 #============== init_t ========================
 allow init_t mscan_spool_t:dir { read };
+allow init_t dcc_var_t:file { execute read open execute_no_trans ioctl map };
+allow init_t dcc_var_t:dir { add_name remove_name };
+allow init_t dcc_var_t:sock_file { create setattr write };
+allow init_t cdcc_exec_t:file { execute read open execute_no_trans map };
+allow init_t su_exec_t:file { execute read open execute_no_trans map };
+allow init_t dcc_client_map_t:file { read write open map lock };
+allow init_t self:process setpgid;
+allow init_t self:passwd rootok;
 
 #============== rsync_t ===================
 allow rsync_t self:capability dac_override;
