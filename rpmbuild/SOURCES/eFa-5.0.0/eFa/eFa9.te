@@ -123,9 +123,10 @@ require {
     type mcelog_t;
     type usr_t;
     type syslogd_var_run_t;
+    type su_exec_t;
     class file { getattr open read ioctl execute create lock append write unlink setattr execute_no_trans rename map };
     class dir { getattr read open search write add_name setattr create remove_name ioctl rmdir watch };
-    class sock_file { getattr write };
+    class sock_file { create getattr setattr write };
     class unix_stream_socket connectto;
     class chr_file getattr;
     class lnk_file { getattr read };
