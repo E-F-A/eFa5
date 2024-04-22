@@ -56,6 +56,9 @@ systemctl disable opendmarc
 # Moved to build script to allow yum/cloud/remote based installs
 #systemctl disable sshd
 
+# Suppress annoying skip messages during boot
+chmod +x /etc/rc.d/rc.local
+
 # Disable selinux for eFaInit phase
 if [[ "$instancetype" != "lxc" ]]; then
   sed -i "/^SELINUX=/ c\SELINUX=permissive" /etc/selinux/config
