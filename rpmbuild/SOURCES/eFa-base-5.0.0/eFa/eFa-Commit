@@ -532,13 +532,11 @@ if [[ $configip -eq 1 ]]; then
       exit 1
     fi
 
-    nmcli con mod $NAME ipv4.method manual ipv4.address "$IPV4ADDRESS/$IPV4NETMASK" ipv4.gateway "$IPV4GATEWAY"
+    nmcli con mod $NAME ipv4.method manual ipv4.address "$IPV4ADDRESS/$IPV4NETMASK" ipv4.gateway "$IPV4GATEWAY" ipv4.dns "127.0.0.1" 
   fi
   if [[ -n $IPV6ADDRESS ]]; then
-    nmcli con mod $NAME ipv6.method manual ipv6.address "$IPV6ADDRESS/$IPV6MASK" ipv6.gateway "$IPV6GATEWAY"
+    nmcli con mod $NAME ipv6.method manual ipv6.address "$IPV6ADDRESS/$IPV6MASK" ipv6.gateway "$IPV6GATEWAY" ipv6.dns "::1"    
   fi
-
-  nmcli con mod $NAME ipv4.dns "127.0.0.1" ipv6.dns "::1"
 
   # Don't bounce interface, will interrupt client on ip change
   #nmcli con down $NAME
