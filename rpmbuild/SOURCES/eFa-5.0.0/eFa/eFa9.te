@@ -398,6 +398,7 @@ allow spamd_update_t shadow_t:file read;
 allow spamd_update_t spamd_var_lib_t:file { execute map };
 allow spamd_update_t system_cronjob_tmp_t:file write;
 allow spamd_update_t admin_home_t:dir { add_name write create };
+allow spamd_update_t admin_home_t:file { create };
 allow spamd_update_t httpd_sys_content_t:file { getattr read open map };
 
 
