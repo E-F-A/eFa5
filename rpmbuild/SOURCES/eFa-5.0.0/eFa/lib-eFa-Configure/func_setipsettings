@@ -45,7 +45,7 @@ func_setipsettings(){
 
   # Set ip settings
   if [[ "$IPV4METHOD" == "auto" ]]; then
-    nmcli connection modify $NAME ipv4.method "auto" ipv4.address "" ipv4.gateway ""
+    nmcli connection modify $NAME ipv4.method "auto" ipv4.address "" ipv4.gateway "" ipv4.dns "127.0.0.1"
     IP4=""
     NM4=""
     GW4=""
@@ -54,7 +54,7 @@ func_setipsettings(){
   fi
   
   if [[ "$IPV6METHOD" == "auto" ]]; then
-    nmcli connection modify $NAME ipv6.method "auto" ipv6.address "" ipv6.gateway ""
+    nmcli connection modify $NAME ipv6.method "auto" ipv6.address "" ipv6.gateway "" ipv6.dns "::1"
     IP6=""
     PF6=""
     GW6=""
@@ -68,11 +68,11 @@ func_setipsettings(){
   fi
 
   if [[ -n $IP4 ]]; then
-    nmcli connection modify $NAME ipv4.address "$IP4/$NM4" ipv4.gateway "$GW4"
+    nmcli connection modify $NAME ipv4.address "$IP4/$NM4" ipv4.gateway "$GW4" ipv4.dns "127.0.0.1"
   fi
 
   if [[ -n $IP6 ]]; then
-    nmcli connection modify $NAME ipv6.address "$IP6/$PF6" ipv6.gateway "$GW6"
+    nmcli connection modify $NAME ipv6.address "$IP6/$PF6" ipv6.gateway "$GW6" ipv6.dns "::1"
   fi
 
   # Write change to eFa-Config
