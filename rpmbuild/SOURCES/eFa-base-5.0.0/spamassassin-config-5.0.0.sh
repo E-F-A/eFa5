@@ -170,7 +170,4 @@ ln -s /etc/mail/spamassassin/v342.pre /etc/MailScanner/mcp/v342.pre
 ln -s /etc/mail/spamassassin/v343.pre /etc/MailScanner/mcp/v343.pre
 ln -s /etc/mail/spamassassin/v400.pre /etc/MailScanner/mcp/v400.pre
 
-mkdir -p /var/spool/postfix/.spamassassin
-chown postfix:mtagroup /var/spool/postfix/.spamassassin
-
 echo "Configuring spamassassin...done"
