@@ -34,7 +34,7 @@ function randompw()
 # +---------------------------------------------------+
 
 # sa-update, if needed
-if [[ ! -d /var/lib/spamassassin/4.000000 ]]; then
+if [[ ! -d /var/lib/spamassassin/4.000001 ]]; then
   cmd='sa-update'
   execcmd
   cmd='sa-compile'
@@ -94,6 +94,10 @@ if [[ -z $(grep smtpd_forbid_bare_newline /etc/postfix/main.cf) ]]; then
     postconf -e "smtpd_discard_ehlo_keywords = chunking, silent-discard"
     postconf -e "smtpd_forbid_bare_newline = yes"
     postconf -e "smtpd_forbid_bare_newline_exclusions = \$mynetworks"
+fi
+
+if [[ ! -e /etc/sysconfig/eFa-Daily-DMARC ]]; then
+  echo 'SENDREPORTS="yes"' > /etc/sysconfig/eFa-Daily-DMARC
 fi
 
 # Enable maintenance mode if not enabled

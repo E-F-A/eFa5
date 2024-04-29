@@ -25,4 +25,4 @@ source /usr/src/eFa/eFa-settings.inc
 #-----------------------------------------------------------------------------#
 
 sed -i "/^Socket\s/ c\Socket inet:8893@127.0.0.1" /etc/opendmarc.conf
-
+echo 'SENDREPORTS="yes"' > /etc/sysconfig/eFa-Daily-DMARC
