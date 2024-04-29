@@ -125,6 +125,12 @@ sed -i "/^# loadplugin Mail::SpamAssassin::Plugin::Shortcircuit/ c\loadplugin Ma
 # Enable Av plugin
 sed -i "/^#loadplugin Mail::SpamAssassin::Plugin::AntiVirus/ c\loadplugin Mail::SpamAssassin::Plugin::AntiVirus" /etc/mail/spamassassin/v310.pre
 
+# Enable AuthRes plugin
+sed -i "/^# loadplugin Mail::SpamAssassin::Plugin::AuthRes/ c\loadplugin Mail::SpamAssassin::Plugin::AuthRes" /etc/mail/spamassassin/v401.pre
+
+# Enable TextCat plugin
+sed -i "/^#loadplugin Mail::SpamAssassin::Plugin::TextCat/ c\loadplugin Mail::SpamAssassin::Plugin::TextCat /etc/mail/spamassassin/v310.pre
+
 # TxRep cleanup tools
 cat > /etc/cron.daily/trim-txrep << 'EOF'
 #!/bin/sh

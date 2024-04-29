@@ -292,6 +292,10 @@ Requires:  perl-DBD-MySQL >= 4.050-13
     # perl-DBD-mysql                             # base    # spamassassin
 Requires: chkconfig >= 1.20-2
     #                                            # base    # dcc
+Requires: perl-LWP-Protocol-https >= 6.10-4
+    #                                            # appstream # spamassassin
+Requires: perl-Devel-Cycle >= 1.12-16
+    #                                            # epel    # spamassassin
 
 # Unverified dependencies
 #Requires:  openssl-devel >= 1:3.0.7-5
@@ -384,6 +388,7 @@ Requires: chkconfig >= 1.20-2
 #    #                                            # eFa     # spamassassin
 #Requires: perl-Net-Works-Network >= 0.22-1
 #    #                                            # eFa     # spamassassin
+
 
 %description
 eFa stands for Email Filter Appliance. eFa is born out of a need for a
