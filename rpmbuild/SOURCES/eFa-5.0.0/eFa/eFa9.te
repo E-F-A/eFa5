@@ -367,9 +367,9 @@ allow httpd_sys_script_t initrc_var_run_t:file { read open lock };
 allow httpd_sys_script_t shadow_t:file { getattr };
 allow httpd_sys_script_t system_dbusd_t:dbus { send_msg };
 allow httpd_sys_script_t usr_t:dir { add_name write remove_name };
-allow httpd_sys_script_t spamd_var_lib_t:dir { add_name write };
+allow httpd_sys_script_t spamd_var_lib_t:dir { add_name write remove_name };
 allow httpd_sys_script_t usr_t:file { create unlink };
-allow httpd_sys_script_t spamd_var_lib_t:file { create };
+allow httpd_sys_script_t spamd_var_lib_t:file { create unlink };
 
 # Allow file release
 allow httpd_sys_script_t postfix_spool_t:file { rename setattr };
