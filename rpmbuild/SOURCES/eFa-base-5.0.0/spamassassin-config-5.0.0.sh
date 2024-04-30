@@ -141,7 +141,7 @@ EOF
 
 chmod +x /etc/cron.daily/trim-txrep
 
-mkdir -p /var/spool/postix/.spamassassin
+mkdir -p /var/spool/postfix/.spamassassin
 ln -s /var/spool/postfix/.spamassassin /usr/share/httpd/.spamassassin
 chown postfix:mtagroup /var/spool/postfix/.spamassassin
 chmod g+w /var/spool/postfix/.spamassassin
