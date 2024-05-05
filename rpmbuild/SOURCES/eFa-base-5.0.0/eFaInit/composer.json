@@ -74,8 +74,6 @@
     },
     "scripts": {
         "auto-scripts": {
-            "assets:install %PUBLIC_DIR%": "symfony-cmd",
-            "importmap:install": "symfony-cmd"
         },
         "post-install-cmd": [
             "@auto-scripts"
