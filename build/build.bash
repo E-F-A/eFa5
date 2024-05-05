@@ -233,7 +233,7 @@ fi
 # Update OS
 #-----------------------------------------------------------------------------#
 logthis "Updating the OS"
-yum -y update >> $LOGFILE 2>&1
+yum -y update | tee -a $LOGFILE
 if [ $? -eq 0 ]; then
     logthis "System Updated"
 fi
@@ -246,7 +246,7 @@ logthis "Installing eFa packages (This can take a while)"
 rpm -q eFa >/dev/null 2>&1
 if [ $? -ne 0 ]; then
     if [[ "$action" != "testingnoefa" && "$action" != "devnoefa" ]]; then
-        yum -y install eFa >> $LOGFILE 2>&1
+        yum -y install eFa | tee -a $LOGFILE
         if [ $? -eq 0 ]; then
             logthis "eFa5 Installed"
         else
