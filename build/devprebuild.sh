@@ -19,15 +19,7 @@
 #######################################################################
 
 # Git path
-GITPATH="/root/eFa5"
-
-# check if user is root
-if [ `whoami` == root ]; then
-  echo "Good you are root."
-else
-  echo "ERROR: Please become root first."
-  exit 1
-fi
+GITPATH="$HOME/eFa5"
 
 # check if we run CentOS 9
 OSVERSION=`cat /etc/redhat-release`
@@ -46,21 +38,21 @@ if [[ -f /etc/selinux/config && -n $(grep -i ^SELINUX=disabled$ /etc/selinux/con
   exit 1
 fi
 
-if [[ ! -d /root/eFa5 ]]; then
+if [[ ! -d /$HOME/eFa5 ]]; then
   echo "- ERROR: git path is incorrect"
-  echo "- ERROR: Please clone to /root/eFa5 or update GITPATH and try again."
+  echo "- ERROR: Please clone to /$HOME/eFa5 or update GITPATH and try again."
   exit 1
 fi
 
-dnf -y install epel-release
+sudo dnf -y install epel-release
 [ $? -ne 0 ] && exit 1
 
-dnf config-manager --set-enabled crb
+sudo dnf config-manager --set-enabled crb
 
-dnf -y update
+sudo dnf -y update
 [ $? -ne 0 ] && exit 1
 
-dnf -y install rpm-build
+sudo dnf -y install rpm-build
 [ $? -ne 0 ] && exit 1
 
 mkdir -p $GITPATH/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
