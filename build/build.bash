@@ -111,7 +111,7 @@ fi
 rpm -q wget >/dev/null 2>&1
 if [ $? -ne 0 ]; then
     logthis "Installing wget"
-    yum -y install wget
+    yum -y install wget | tee -a $LOGFILE
     if [ $? -eq 0 ]; then
         logthis "wget installed"
     else
@@ -127,7 +127,7 @@ fi
 rpm -q perl >/dev/null 2>&1
 if [ $? -ne 0 ]; then
     logthis "Installing perl"
-    yum -y install perl
+    yum -y install perl | tee -a $LOGFILE
     if [ $? -eq 0 ]; then
         logthis "perl installed"
     else
@@ -186,7 +186,7 @@ esac
 rpm -q epel-release >/dev/null 2>&1
 if [ $? -ne 0 ]; then
     logthis "Installing EPEL Repo"
-    yum -y install epel-release
+    yum -y install epel-release | tee -a $LOGFILE
     if [ $? -eq 0 ]; then
         logthis "EPEL repo installed"
     else
@@ -199,7 +199,7 @@ fi
 #-----------------------------------------------------------------------------#
 # crb repo
 #-----------------------------------------------------------------------------#
-dnf config-manager --set-enabled crb
+dnf config-manager --set-enabled crb | tee -a $LOGFILE
 if [ $? -eq 0 ]; then
     logthis "crb repo enabled"
 else
@@ -211,13 +211,13 @@ fi
 #-----------------------------------------------------------------------------#
 # php 8.1 
 #-----------------------------------------------------------------------------#
-dnf module -y reset php
+dnf module -y reset php | tee -a $LOGFILE
 if [ $? -ne 0 ]; then
     logthis "ERROR: Reset php dnf module failed"
     logthis "^^^^^^^^^^ SCRIPT ABORTED ^^^^^^^^^^"
     exit 1
 fi
-dnf module -y enable php:8.1
+dnf module -y enable php:8.1 | tee -a $LOGFILE
 if [ $? -eq 0 ]; then
     logthis "php 8.1 stream enabled"
 else
