@@ -9,13 +9,10 @@ use App\Validator\Constraints as eFaInitAssert;
 class eFaInitTask
 {
 
-    /**
-     * @Assert\Locale(
-     *    groups={"Language"}
-     * )
-     */
+    #[Assert\Locale(
+	groups: ['Language']
+    )]
     protected $locale;
-
 
     public function getLanguage()
     {
@@ -26,23 +23,20 @@ class eFaInitTask
     {
         $this->locale = $locale;
     }
-
-    /**
-     * @Assert\NotBlank(
-     *    groups={"Hostname"}
-     * )
-     * @Assert\Length(
-     *    min     = 2,
-     *    max     = 256,
-     *    groups={"Hostname"}
-     * )
-     * @Assert\Regex(
-     *    "/^[-a-zA-Z0-9]+$/",
-     *    groups={"Hostname"}
-     * )
-     */
+   
+    #[Assert\NotBlank(
+        groups: ['Hostname']
+    )]
+    #[Assert\Length(
+        min: 2, 
+	max: 256,
+	groups: ['Hostname']
+    )]
+    #[Assert\Regex(
+        pattern: "/^[-a-zA-Z0-9]+$/",
+	groups: ['Hostname']
+    )]
     protected $hostname;
-
 
     public function getHostname()
     {
@@ -54,22 +48,19 @@ class eFaInitTask
         $this->hostname = $var;
     }
 
-    /**
-     * @Assert\NotBlank(
-     *    groups={"Domainname"}
-     * )
-     * @Assert\Length(
-     *    min     = 2,
-     *    max     = 256,
-     *    groups={"Domainname"}
-     * )
-     * @Assert\Regex(
-     *    "/^[a-zA-Z0-9]+([\-\.]{1}[a-zA-Z0-9-]+)*$/",
-     *    groups={"Domainname"}
-     * )
-     */
+    #[Assert\NotBlank(
+        groups: ['Domainname']
+    )]
+    #[Assert\Length(
+        min: 2,
+        max: 256,
+        groups: ['Domainname']
+    )]
+    #[Assert\Regex(
+        pattern: '/^[a-zA-Z0-9]+([\-\.]{1}[a-zA-Z0-9-]+)*$/',
+        groups: ['Domainname']
+    )]
     protected $domainname;
-
 
     public function getDomainname()
     {
@@ -81,21 +72,18 @@ class eFaInitTask
         $this->domainname = $var;
     }
 
-    /**
-     * @Assert\NotBlank(
-     *    groups={"Email"}
-     * )
-     * @Assert\Length(
-     *    min     = 2,
-     *    max     = 256,
-     *    groups={"Email"}
-     * )
-     * @Assert\Email(
-     *    groups={"Email"}
-     * )
-     */
+    #[Assert\NotBlank(
+        groups: ['Email']
+    )]
+    #[Assert\Length(
+        min: 2,
+        max: 256,
+        groups: ['Email']
+    )]
+    #[Assert\Email(
+        groups: ['Email']
+    )]
     protected $email;
-
 
     public function getEmail()
     {
@@ -107,11 +95,9 @@ class eFaInitTask
         $this->email = $var;
     }
 
-    /**
-     * @Assert\NotBlank(
-     *    groups={"Interface"}
-     * )
-     */
+    #[Assert\NotBlank(
+        groups: ['Interface']
+    )]
     protected $interface;
 
     public function getInterface()
@@ -124,22 +110,19 @@ class eFaInitTask
         $this->interface = $var;
     } 
 
-    /**
-     * @Assert\NotBlank(
-     *    groups={"IPv4address"}
-     * )
-     * @Assert\Length(
-     *    min     = 7,
-     *    max     = 15,
-     *    groups={"IPv4address"}
-     * )
-     * @Assert\Ip(
-     *    version = 4,
-     *    groups={"IPv4address"}
-     * )
-     */
+    #[Assert\NotBlank(
+        groups: ['IPv4address']
+    )]
+    #[Assert\Length(
+        min: 7,
+        max: 15,
+        groups: ['IPv4address']
+    )]
+    #[Assert\Ip(
+        version: 4,
+        groups: ['IPv4address']
+    )]
     protected $ipv4address;
-
 
     public function getIPv4address()
     {
@@ -151,18 +134,15 @@ class eFaInitTask
         $this->ipv4address = $var;
     }
 
-    /**
-     * @Assert\NotBlank(
-     *    groups={"IPv4netmask"}
-     * )
-     * @Assert\Range(
-     *    min = 1,
-     *    max = 32,
-     *    groups={"IPv4netmask"}
-     * )
-     */
+    #[Assert\NotBlank(
+        groups: ['IPv4netmask']
+    )]
+    #[Assert\Range(
+        min: 1,
+        max: 32,
+        groups: ['IPv4netmask']
+    )]
     protected $ipv4netmask;
-
 
     public function getIPv4netmask()
     {
@@ -174,23 +154,19 @@ class eFaInitTask
         $this->ipv4netmask = $var;
     }
 
-
-    /**
-     * @Assert\NotBlank(
-     *    groups={"IPv4gateway"}
-     *)
-     * @Assert\Length(
-     *    min     = 7,
-     *    max     = 15,
-     *    groups={"IPv4gateway"}
-     * )
-     * @Assert\Ip(
-     *    version = 4,
-     *    groups={"IPv4gateway"}
-     * )
-     */
+    #[Assert\NotBlank(
+        groups: ['IPv4gateway']
+    )]
+    #[Assert\Length(
+        min: 7,
+        max: 15,
+        groups: ['IPv4gateway']
+    )]
+    #[Assert\Ip(
+        version: 4,
+        groups: ['IPv4gateway']
+    )]
     protected $ipv4gateway;
-
 
     public function getIPv4gateway()
     {
@@ -202,22 +178,19 @@ class eFaInitTask
         $this->ipv4gateway = $var;
     }
 
-    /**
-     * @Assert\NotBlank(
-     *    groups={"IPv6address"}
-     * )
-     * @Assert\Length(
-     *    min     = 3,
-     *    max     = 40,
-     *    groups={"IPv6address"}
-     * )
-     * @Assert\Ip(
-     *    version = 6,
-     *    groups={"IPv6address"}
-     * )
-     */
+    #[Assert\NotBlank(
+        groups: ['IPv6address']
+    )]
+    #[Assert\Length(
+        min: 3,
+        max: 40,
+        groups: ['IPv6address']
+    )]
+    #[Assert\Ip(
+        version: 6,
+        groups: ['IPv6address']
+    )]
     protected $ipv6address;
-
 
     public function getIPv6address()
     {
@@ -229,18 +202,15 @@ class eFaInitTask
         $this->ipv6address = $var;
     }
 
-    /**
-     * @Assert\NotBlank(
-     *    groups={"IPv6prefix"}
-     * )
-     * @Assert\Range(
-     *    min = 1,
-     *    max = 128,
-     *    groups={"IPv6prefix"}
-     * )
-     */
+    #[Assert\NotBlank(
+        groups: ['IPv6prefix']
+    )]
+    #[Assert\Range(
+        min: 1,
+        max: 128,
+        groups: ['IPv6prefix']
+    )]
     protected $ipv6prefix;
-
 
     public function getIPv6prefix()
     {
@@ -252,23 +222,19 @@ class eFaInitTask
         $this->ipv6prefix = $var;
     }
 
-
-    /**
-     * @Assert\NotBlank(
-     *    groups={"IPv6gateway"}
-     *)
-     * @Assert\Length(
-     *    min     = 3,
-     *    max     = 40,
-     *    groups={"IPv6gateway"}
-     * )
-     * @Assert\Ip(
-     *    version = 6,
-     *    groups={"IPv6gateway"}
-     * )
-     */
+    #[Assert\NotBlank(
+        groups: ['IPv6gateway']
+    )]
+    #[Assert\Length(
+        min: 3,
+        max: 40,
+        groups: ['IPv6gateway']
+    )]
+    #[Assert\Ip(
+        version: 6,
+        groups: ['IPv6gateway']
+    )]
     protected $ipv6gateway;
-
 
     public function getIPv6gateway()
     {
@@ -280,16 +246,13 @@ class eFaInitTask
         $this->ipv6gateway = $var;
     }
 
-    /**
-     * @Assert\NotBlank(
-     *    groups={"DNS1"}
-     *)
-     * @Assert\Ip(
-     *    groups={"DNS1"}
-     * )
-     */
+    #[Assert\NotBlank(
+        groups: ['DNS1']
+    )]
+    #[Assert\Ip(
+        groups: ['DNS1']
+    )]
     protected $dns1;
-
 
     public function getDNS1()
     {
@@ -301,16 +264,13 @@ class eFaInitTask
         $this->dns1 = $var;
     }
 
-    /**
-     * @Assert\NotBlank(
-     *    groups={"DNS2"}
-     * )
-     * @Assert\Ip(
-     *    groups={"DNS2"}
-     * )
-     */
+    #[Assert\NotBlank(
+        groups: ['DNS2']
+    )]
+    #[Assert\Ip(
+        groups: ['DNS2']
+    )]
     protected $dns2;
-
 
     public function getDNS2()
     {
@@ -322,14 +282,12 @@ class eFaInitTask
         $this->dns2 = $var;
     }
 
-    /**
-     * @Assert\NotBlank(
-     *    groups={"Webusername"}
-     * )
-     * @eFaInitAssert\UsernameOrEmail(
-     *    groups={"Webusername"}
-     * )
-     */
+    #[Assert\NotBlank(
+        groups: ['Webusername']
+    )]
+    #[eFaInitAssert\UsernameOrEmail(
+        groups: ['Webusername']
+    )]
     protected $webusername;
 
 
@@ -343,16 +301,13 @@ class eFaInitTask
         $this->webusername = $var;
     }
 
-    /**
-     * @Assert\NotBlank(
-     *    groups={"CLIusername"}
-     * )
-     * @eFaInitAssert\CLIUsername(
-     *    groups={"CLIusername"}
-     * )
-     */
+    #[Assert\NotBlank(
+        groups: ['CLIusername']
+    )]
+    #[eFaInitAssert\CLIUsername(
+        groups: ['CLIusername']
+    )]
     protected $cliusername;
-
 
     public function getCLIusername()
     {
@@ -364,16 +319,14 @@ class eFaInitTask
         $this->cliusername = $var;
     }
 
-    /**
-     * @Assert\NotBlank(
-     *    groups={"Webpassword1"}
-     * )
-     * @Assert\Length(
-     *    min=1,
-     *    max=256,
-     *    groups={"Webpassword1"}
-     * )
-     */
+    #[Assert\NotBlank(
+        groups: ['Webpassword1']
+    )]
+    #[Assert\Length(
+        min: 1,
+        max: 256,
+        groups: ['Webpassword1']
+    )]
     protected $webpassword1;
     protected $webpassword2;
 
@@ -398,28 +351,23 @@ class eFaInitTask
         $this->webpassword1 = $var;
     }
 
-    /**
-     * @Assert\IsTrue(
-     *     message="Passwords do not match",
-     *     groups={"Webpassword2"}
-     * )
-     *        
-     */
+    #[Assert\IsTrue(
+        message: 'Passwords do not match',
+        groups: ['Webpassword2']
+    )]
     public function isWebPasswordSame()
     {
          return $this->webpassword1 === $this->webpassword2;
     }
 
-    /**
-     * @Assert\NotBlank(
-     *    groups={"CLIpassword1"}
-     * )
-     * @Assert\Length(
-     *    min=1,
-     *    max=256,
-     *    groups={"CLIpassword1"}
-     * )
-     */
+    #[Assert\NotBlank(
+        groups: ['CLIpassword1']
+    )]
+    #[Assert\Length(
+        min: 1,
+        max: 256,
+        groups: ['CLIpassword1']
+    )]
     protected $clipassword1;
     protected $clipassword2;
 
@@ -443,25 +391,19 @@ class eFaInitTask
         $this->clipassword1 = $var;
     }
 
-    /**
-     * @Assert\IsTrue(
-     *     message="Passwords do not match",
-     *     groups={"CLIpassword2"}
-     * )
-     *        
-     */
+    #[Assert\IsTrue(
+        message: 'Passwords do not match',
+        groups: ['CLIpassword2']
+    )]
     public function isCLIPasswordSame()
     {
          return $this->clipassword1 === $this->clipassword2;
     }
 
-    /**
-     * @Assert\NotBlank(
-     *    groups={"Timezone"}
-     * )
-     */
+    #[Assert\NotBlank(
+        groups: ['Timezone']
+    )]
     protected $timezone;
-
 
     public function getTimezone()
     {
@@ -473,17 +415,14 @@ class eFaInitTask
         $this->timezone = $var;
     }
 
-    /**
-     * @Assert\NotBlank(
-     *    groups={"Mailserver"}
-     * )
-     * @Assert\Regex(
-     *    "/^[-a-zA-Z0-9\.]{2,256}+$/",
-     *    groups={"Mailserver"}
-     * )
-     */
+    #[Assert\NotBlank(
+        groups: ['Mailserver']
+    )]
+    #[Assert\Regex(
+        pattern: '/^[-a-zA-Z0-9\.]{2,256}+$/',
+        groups: ['Mailserver']
+    )]
     protected $mailserver;
-
 
     public function getMailserver()
     {
@@ -495,17 +434,14 @@ class eFaInitTask
         $this->mailserver = $var;
     }
 
-    /**
-     * @Assert\NotBlank(
-     *    groups={"IANAcode"}
-     * )
-     * @Assert\Regex(
-     *    "/^[a-z]{1,2}$/",
-     *    groups={"IANAcode"}
-     * )
-     */
+    #[Assert\NotBlank(
+        groups: ['IANAcode']
+    )]
+    #[Assert\Regex(
+        pattern: '/^[a-z]{1,2}$/',
+        groups: ['IANAcode']
+    )]
     protected $ianacode;
-
 
     public function getIANAcode()
     {
@@ -517,17 +453,14 @@ class eFaInitTask
         $this->ianacode = $var;
     }
 
-    /**
-     * @Assert\NotBlank(
-     *    groups={"Orgname"}
-     * )
-     * @Assert\Regex(
-     *    "/^[a-zA-Z1-9]{2,253}$/",
-     *    groups={"Orgname"}
-     * )
-     */
+    #[Assert\NotBlank(
+        groups: ['Orgname']
+    )]
+    #[Assert\Regex(
+        pattern: '/^[a-zA-Z1-9]{2,253}$/',
+        groups: ['Orgname']
+    )]
     protected $orgname;
-
 
     public function getOrgname()
     {
@@ -538,8 +471,5 @@ class eFaInitTask
     {
         $this->orgname = $var;
     }
-
-
-
 }
 ?>

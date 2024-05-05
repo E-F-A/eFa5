@@ -13,3 +13,5 @@
 /rpmbuild/SOURCES/*.tgz
 /rpmbuild/SOURCES/*.png
 /rpmbuild/SOURCES/*.ico
+/rpmbuild/SOURCES/eFa-base-5.0.0/eFaInit.old
+/rpmbuild/SOURCES/eFa-base-5.0.0/eFaInit.old/*

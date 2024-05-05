@@ -13,7 +13,7 @@ use Symfony\Component\Form\Extension\Core\Type\TextType;
 
 class PasswordEditTaskType extends AbstractType
 {
-    public function buildForm(FormBuilderInterface $builder, array $options)
+    public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
             ->add('Passwordbox1', PasswordType::class, array(
@@ -31,7 +31,7 @@ class PasswordEditTaskType extends AbstractType
             ))
             ;
     }
-    public function configureOptions(OptionsResolver $resolver)
+    public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults(array(
             'data_class'    => eFaInitTask::class,

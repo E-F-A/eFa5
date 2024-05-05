@@ -196,6 +196,9 @@ if [ $? -ne 0 ]; then
     fi
 fi
 
+#-----------------------------------------------------------------------------#
+# crb repo
+#-----------------------------------------------------------------------------#
 dnf config-manager --set-enabled crb
 if [ $? -eq 0 ]; then
     logthis "crb repo enabled"
@@ -204,6 +207,25 @@ else
     logthis "^^^^^^^^^^ SCRIPT ABORTED ^^^^^^^^^^"
     exit 1
 fi
+
+#-----------------------------------------------------------------------------#
+# php 8.1 
+#-----------------------------------------------------------------------------#
+dnf module -y reset php
+if [ $? -ne 0 ]; then
+    logthis "ERROR: Reset php dnf module failed"
+    logthis "^^^^^^^^^^ SCRIPT ABORTED ^^^^^^^^^^"
+    exit 1
+fi
+dnf module -y enable php:8.1
+if [ $? -eq 0 ]; then
+    logthis "php 8.1 stream enabled"
+else
+    logthis "ERROR: php 8.1 stream enable failed"
+    logthis "^^^^^^^^^^ SCRIPT ABORTED ^^^^^^^^^^"
+    exit 1
+fi
+
 #-----------------------------------------------------------------------------#
 
 #-----------------------------------------------------------------------------#

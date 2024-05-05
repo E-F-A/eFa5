@@ -12,7 +12,7 @@ use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 
 class LanguageEditTaskType extends AbstractType
 {
-    public function buildForm(FormBuilderInterface $builder, array $options)
+    public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
             ->add('Language', ChoiceType::class, array(
@@ -42,7 +42,7 @@ class LanguageEditTaskType extends AbstractType
             ->add('Save', SubmitType::class)
         ;
     }
-    public function configureOptions(OptionsResolver $resolver)
+    public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults(array(
             'data_class' => eFaInitTask::class,

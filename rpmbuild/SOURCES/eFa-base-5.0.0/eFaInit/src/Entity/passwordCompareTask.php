@@ -20,11 +20,9 @@ class passwordCompareTask
         $this->password2 = $var;
     }
 
-    /**
-     * @Assert\IsFalse(
-     *     message="Web and CLI Passwords cannot match"
-     * )
-     */
+    #[Assert\IsFalse(
+        message: 'Web and CLI Passwords cannot match'
+    )]
     public function isPasswordsSame()
     {
          return $this->password1 === $this->password2;

@@ -12,7 +12,7 @@ use Symfony\Component\Form\Extension\Core\Type\TimezoneType;
 
 class TimezoneTaskType extends AbstractType
 {
-    public function buildForm(FormBuilderInterface $builder, array $options)
+    public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
             ->add('Timezone', TimezoneType::class, array(
@@ -27,7 +27,7 @@ class TimezoneTaskType extends AbstractType
             ->add('NextHidden', SubmitType::class)
         ;
     }
-    public function configureOptions(OptionsResolver $resolver)
+    public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults(array(
             'data_class' => eFaInitTask::class,

@@ -12,14 +12,14 @@ use Symfony\Component\Form\Extension\Core\Type\SubmitType;
 
 class VerifySettingsTaskType extends AbstractType
 {
-    public function buildForm(FormBuilderInterface $builder, array $options)
+    public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
             ->add('Configure', SubmitType::class, array(
             ))
             ;
     }
-    public function configureOptions(OptionsResolver $resolver)
+    public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults(array(
             'data_class'    => eFaInitTask::class,
