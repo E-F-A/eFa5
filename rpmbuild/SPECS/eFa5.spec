@@ -296,6 +296,8 @@ Requires: perl-LWP-Protocol-https >= 6.10-4
     #                                            # appstream # spamassassin
 Requires: perl-Devel-Cycle >= 1.12-16
     #                                            # epel    # spamassassin
+Requires: certbot >= 2.9.0-1
+    #                                            # epel    # eFa
 
 # Unverified dependencies
 #Requires:  openssl-devel >= 1:3.0.7-5
