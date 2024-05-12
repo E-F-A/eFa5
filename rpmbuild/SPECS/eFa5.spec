@@ -17,7 +17,7 @@
 # along with this SPEC. If not, see <http://www.gnu.org/licenses/>.
 #-----------------------------------------------------------------------------#
 
-%define releasenum 5
+%define releasenum 6
 
 Name:      eFa
 Summary:   eFa Maintenance rpm
@@ -541,6 +541,9 @@ rm -rf $RPM_BUILD_ROOT
 %attr(0644, root, root) %{_sysconfdir}/logrotate.d/eFa-logrotate
 
 %changelog
+* Sun May 12 2024 eFa Project <shawniverson@efa-project.org> - 5.0.0-6
+- Add certbot as a dependency for eFa
+
 * Sat Apr 13 2024 eFa Project <shawniverson@efa-project.org> - 5.0.0-5
 - Fixes for opendkim and operndmarc socket configuration, spamassassin 4.0.1
 
