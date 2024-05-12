@@ -542,7 +542,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %changelog
 * Sun May 12 2024 eFa Project <shawniverson@efa-project.org> - 5.0.0-6
-- Add certbot as a dependency for eFa
+- Add certbot as a dependency for eFa, ensure freshclam is enabled
 
 * Sat Apr 13 2024 eFa Project <shawniverson@efa-project.org> - 5.0.0-5
 - Fixes for opendkim and operndmarc socket configuration, spamassassin 4.0.1
