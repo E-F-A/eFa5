@@ -21,7 +21,9 @@ function func_webmin() {
       if [[ $ASKWEBMIN =~ ^[yY]$ || -z $ASKWEBMIN ]]; then
         flag2=1
 
-        curl https://raw.githubusercontent.com/webmin/webmin/master/setup-repos.sh | sh
+        curl -o /var/eFa/lib/setup-repos.sh https://raw.githubusercontent.com/webmin/webmin/master/setup-repos.sh
+        sh /var/eFa/lib/setup-repos.sh --force
+        rm -f /var/eFa/lib/setup-repos.sh
         
         # Install webmin
         dnf -y install webmin
@@ -41,7 +43,7 @@ function func_webmin() {
           read -s webminpwd2
           echo -e ""
 
-          if [[ "$webminpwd1" != "$webminpwd2" ]]; then
+          if [[ -z $webminpwd1 || "$webminpwd1" != "$webminpwd2" ]]; then
             echo "$green[eFa]$clean Passwords do not match, please try again."
           else
             flag=1
