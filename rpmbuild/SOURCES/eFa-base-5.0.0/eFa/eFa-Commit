@@ -936,6 +936,7 @@ if [[ $finalize -eq 1 ]]; then
 <html>
     <head>
     <title>MailWatch</title>
+    <meta name="robots" content="noindex">
     <meta http-equiv="refresh" content="0; url=/mailscanner/" />
     </head>
     <body>
