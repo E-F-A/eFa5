@@ -74,7 +74,7 @@ rm -f %{buildroot}%{_bindir}/mailwatch/tools/Cron_jobs/INSTALL
 
 mkdir -p %{buildroot}%{_sysconfdir}/cron.daily
 cat > %{buildroot}%{_sysconfdir}/cron.daily/mailwatch << 'EOF'
-#!/bin/bash" > %{buildroot}%{_sysconfdir}/cron.daily/mailwatch
+#!/bin/bash
 /usr/bin/mailwatch/tools/Cron_jobs/mailwatch_quarantine_report.php >/dev/null 2>&1
 /usr/bin/mailwatch/tools/Cron_jobs/mailwatch_quarantine_maint.php --clean >/dev/null 2>&1
 /usr/bin/mailwatch/tools/Cron_jobs/mailwatch_db_clean.php >/dev/null 2>&1
