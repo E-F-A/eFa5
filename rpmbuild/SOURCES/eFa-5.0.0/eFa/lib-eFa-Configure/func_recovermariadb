@@ -45,7 +45,7 @@ function func_recover-mariadb() {
         pause
 
         echo -e "Cleaning up mtalog table"
-        DAYSTOKEEP=grep "^define('RECORD_DAYS_TO_KEEP'" /var/www/html/mailscanner/conf.php | cut -d',' -f2 | tr -d " );" 
+        DAYSTOKEEP=$(grep "^define('RECORD_DAYS_TO_KEEP'" /var/www/html/mailscanner/conf.php | cut -d',' -f2 | tr -d " );")
         mysql -u root -p$MYSQLPW --database=mailscanner -e "DELETE FROM mtalog WHERE timestamp < (NOW() - INTERVAL $DAYSTOKEEP DAY);"
         pause
 
