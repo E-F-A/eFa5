@@ -8,7 +8,7 @@ function func_recover-mariadb() {
   echo -e ""
   echo -e "Description:"
   echo -e "This tool will assist with MariaDB recovery"
-  echo -e "after a system crash or power failure."
+  echo -e "after a system crash, power failure, or performance issue."
   echo -e ""
   echo -e "If recovery fails, it is recommended that"
   echo -e "you restore your MariaDB database from a"
@@ -39,7 +39,16 @@ function func_recover-mariadb() {
         echo -e "Performing additional database checks"
         mysqlcheck -u root -p$MYSQLPW --repair --all-databases
         pause
-       
+
+        echo -e "Cleaning up mtalog_ids table"
+        mysql -u root -p$MYSQLPW --database=mailscanner -e "DELETE FROM mtalog_ids WHERE smtp_id not in (SELECT msg_id FROM mtalog);"
+        pause
+
+        echo -e "Cleaning up mtalog table"
+        DAYSTOKEEP=grep "^define('RECORD_DAYS_TO_KEEP'" /var/www/html/mailscanner/conf.php | cut -d',' -f2 | tr -d " );" 
+        mysql -u root -p$MYSQLPW --database=mailscanner -e "DELETE FROM mtalog WHERE timestamp < (NOW() - INTERVAL $DAYSTOKEEP DAY);"
+        pause
+
         echo -e "Runing database optimization"
         mysqlcheck -u root -p$MYSQLPW --optimize --all-databases
         pause

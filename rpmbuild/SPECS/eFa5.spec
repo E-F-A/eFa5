@@ -17,7 +17,7 @@
 # along with this SPEC. If not, see <http://www.gnu.org/licenses/>.
 #-----------------------------------------------------------------------------#
 
-%define releasenum 6
+%define releasenum 7
 
 Name:      eFa
 Summary:   eFa Maintenance rpm
@@ -280,7 +280,7 @@ Requires:  sqlgrey >= 1:1.8.0-8
     # sqlgrey                                    # eFa       # Greylisting
 Requires: sqlgreywebinterface >= 1:1.1.9-5
     # sqlgreywebinterrface                       # eFa       # mailwatch
-Requires:  MailWatch >= 1:1.2.18-5
+Requires:  MailWatch >= 1:1.2.23-2
     # MailWatch                                  # eFa     # MailWatch Frontend
 Requires:  spamassassin >= 4.0.1-2
     # spamassassin                               # eFa     # MailScanner
@@ -541,6 +541,9 @@ rm -rf $RPM_BUILD_ROOT
 %attr(0644, root, root) %{_sysconfdir}/logrotate.d/eFa-logrotate
 
 %changelog
+* Sun Jun 09 2024 eFa Project <shawniverson@efa-project.org> - 5.0.0-7
+- Update MailWatch and additional cleanup mariadb recovery
+
 * Sun May 12 2024 eFa Project <shawniverson@efa-project.org> - 5.0.0-6
 - Add certbot as a dependency for eFa, ensure freshclam is enabled
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 #-----------------------------------------------------------------------------#
-# eFa 5.0.0 build script version 20230304
+# eFa 5.0.0 build script version 20240609
 #-----------------------------------------------------------------------------#
 # Copyright (C) 2013~2024 https://efa-project.org
 #
@@ -30,7 +30,7 @@ LOGFILE="/var/log/eFa/build.log"
 # Set up logging
 #-----------------------------------------------------------------------------#
 LOGGER='/usr/bin/logger'
-HEADER='=============  EFA5 BUILD SCRIPT STARTING  ============'
+HEADER='=============  EFA 4 (EL 8) / 5 (EL 9) BUILD SCRIPT STARTING  ============'
 
 # CREATE LOG FOLDER IF NOT EXISTS
 mkdir -p $(dirname "${LOGFILE}")
@@ -39,7 +39,7 @@ mkdir -p $(dirname "${LOGFILE}")
 ( [ -e "$LOGFILE" ] || touch "$LOGFILE" ) && [ ! -w "$LOGFILE" ] && echo "Unable to create or write to $LOGFILE"
 
 function logthis() {
-    TAG='EFA5'
+    TAG='EFA'
     MSG="$1"
     $LOGGER -t "$TAG" "$MSG"
     echo "`date +%Y.%m.%d-%H:%M:%S` - $MSG"
@@ -68,8 +68,11 @@ OSVERSION=`cat /etc/redhat-release`
 if [[ $OSVERSION =~ .*'release 9'.* ]]; then
   logthis "Good you are running CentOS 9 Stream or similar flavor"
   RELEASE=9
+elif [[ $OSVERSION =~ .*'release 8'.* ]]; then
+  logthis "Good you are running CentOS 8 or similar flavor"
+  RELEASE=8
 else
-  logthis "ERROR: You are not running CentOS 9 Stream or equivalent"
+  logthis "ERROR: You are not running CentOS 8, CentOS 9 Stream or equivalent"
   logthis "ERROR: Unsupported system, stopping now"
   logthis "^^^^^^^^^^ SCRIPT ABORTED ^^^^^^^^^^"
   exit 1
@@ -142,41 +145,63 @@ fi
 #-----------------------------------------------------------------------------#
 case "$action" in
     ("testing"|"kstesting"|"testingnoefa")
-       if [[ ! -f /etc/yum.repos.d/eFa5-test.repo ]]; then
-            logthis "Adding eFa CentOS 9 test Repo"
-            mkdir -p /usr/src/eFa
-            curl -sSL $mirror/rpm/eFa5/centos9/RPM-GPG-KEY-eFa-Project-256 > /usr/src/eFa/RPM-GPG-KEY-eFa-Project-256
-            rpm --import /usr/src/eFa/RPM-GPG-KEY-eFa-Project-256
-            curl -L $mirror/rpm/eFa5/centos9/eFa5-test.repo -o /etc/yum.repos.d/eFa5-test.repo
-       fi
-       ;;
+        if [[ $RELEASE -eq 9 ]]; then
+            if [[ ! -f /etc/yum.repos.d/eFa5-test.repo ]]; then
+                logthis "Adding eFa CentOS 9 test Repo"
+                mkdir -p /usr/src/eFa
+                curl -sSL $mirror/rpm/eFa5/centos9/RPM-GPG-KEY-eFa-Project-256 > /usr/src/eFa/RPM-GPG-KEY-eFa-Project-256
+                rpm --import /usr/src/eFa/RPM-GPG-KEY-eFa-Project-256
+                curl -L $mirror/rpm/eFa5/centos9/eFa5-test.repo -o /etc/yum.repos.d/eFa5-test.repo
+            fi
+        else
+            if [[ ! -f /etc/yum.repos.d/eFa4-testing.repo ]]; then
+                logthis "Adding eFa CentOS 8 Testing Repo"
+                mkdir -p /usr/src/eFa
+                curl -sSL $mirror/rpm/eFa4/RPM-GPG-KEY-eFa-Project > /usr/src/eFa/RPM-GPG-KEY-eFa-Project
+                rpm --import /usr/src/eFa/RPM-GPG-KEY-eFa-Project
+                curl -L $mirror/rpm/eFa4/CentOS8/eFa4-centos8-testing.repo -o /etc/yum.repos.d/eFa4-testing.repo
+            fi
+        fi
+        ;;
     
     ("dev"|"ksdev"|"devnoefa")
-       if [[ ! -f /etc/yum.repos.d/eFa5-dev.repo ]]; then
-            logthis "Adding eFa CentOS 9 Dev Repo"
-            mkdir -p /usr/src/eFa
-            curl -sSL $mirror/rpm/eFa5/centos9/RPM-GPG-KEY-eFa-Project-256 > /usr/src/eFa/RPM-GPG-KEY-eFa-Project-256
-            rpm --import /usr/src/eFa/RPM-GPG-KEY-eFa-Project-256
-            curl -L $mirror/rpm/eFa5/centos9/eFa5-dev.repo -o /etc/yum.repos.d/eFa5-dev.repo
+        if [[ $RELEASE -eq 9 ]]; then
+            if [[ ! -f /etc/yum.repos.d/eFa5-dev.repo ]]; then
+                logthis "Adding eFa CentOS 9 Dev Repo"
+                mkdir -p /usr/src/eFa
+                curl -sSL $mirror/rpm/eFa5/centos9/RPM-GPG-KEY-eFa-Project-256 > /usr/src/eFa/RPM-GPG-KEY-eFa-Project-256
+                rpm --import /usr/src/eFa/RPM-GPG-KEY-eFa-Project-256
+                curl -L $mirror/rpm/eFa5/centos9/eFa5-dev.repo -o /etc/yum.repos.d/eFa5-dev.repo
+            fi
+        else
+            if [[ ! -f /etc/yum.repos.d/eFa4-dev.repo ]]; then
+                logthis "Adding eFa CentOS 8 Dev Repo"
+                mkdir -p /usr/src/eFa
+                curl -sSL $mirror/rpm/eFa4/RPM-GPG-KEY-eFa-Project > /usr/src/eFa/RPM-GPG-KEY-eFa-Project
+                rpm --import /usr/src/eFa/RPM-GPG-KEY-eFa-Project
+                curl -L $mirror/rpm/eFa4/CentOS8/eFa4-centos8-dev.repo -o /etc/yum.repos.d/eFa4-dev.repo
+            fi
         fi
-       ;;
+        ;;
 
-    # *)  if [ ! -f /etc/yum.repos.d/eFa4.repo ]; then
-    #         if [[ $RELEASE -eq 7 ]]; then
-    #             logthis "Adding eFa Repo"
-    #             mkdir -p /usr/src/eFa
-    #             curl -sSL $mirror/rpm/eFa4/RPM-GPG-KEY-eFa-Project > /usr/src/eFa/RPM-GPG-KEY-eFa-Project
-    #             rpm --import /usr/src/eFa/RPM-GPG-KEY-eFa-Project
-    #             curl -L $mirror/rpm/eFa4/eFa4.repo -o /etc/yum.repos.d/eFa4.repo
-    #         else
-    #             logthis "Adding eFa Repo"
-    #             mkdir -p /usr/src/eFa
-    #             curl -sSL $mirror/rpm/eFa4/RPM-GPG-KEY-eFa-Project > /usr/src/eFa/RPM-GPG-KEY-eFa-Project
-    #             rpm --import /usr/src/eFa/RPM-GPG-KEY-eFa-Project
-    #             curl -L $mirror/rpm/eFa4/CentOS8/eFa4-centos8.repo -o /etc/yum.repos.d/eFa4.repo
-    #         fi
-    #     fi
-    #     ;;
+    *)  if [[ $RELEASE -eq 9 ]]; then
+            if [[ ! -f /etc/yum.repos.d/eFa5-release.repo ]]; then
+                logthis "Adding eFa CentOS 9 Release Repo"
+                mkdir -p /usr/src/eFa
+                curl -sSL $mirror/rpm/eFa5/centos9/RPM-GPG-KEY-eFa-Project-256 > /usr/src/eFa/RPM-GPG-KEY-eFa-Project-256
+                rpm --import /usr/src/eFa/RPM-GPG-KEY-eFa-Project-256
+                curl -L $mirror/rpm/eFa5/centos9/eFa5-release.repo -o /etc/yum.repos.d/eFa5-release.repo
+            fi
+        else
+            if [ ! -f /etc/yum.repos.d/eFa4.repo ]; then
+                logthis "Adding eFa Repo"
+                mkdir -p /usr/src/eFa
+                curl -sSL $mirror/rpm/eFa4/RPM-GPG-KEY-eFa-Project > /usr/src/eFa/RPM-GPG-KEY-eFa-Project
+                rpm --import /usr/src/eFa/RPM-GPG-KEY-eFa-Project
+                curl -L $mirror/rpm/eFa4/CentOS8/eFa4-centos8.repo -o /etc/yum.repos.d/eFa4.repo
+            fi
+        fi
+        ;;
 esac
 #-----------------------------------------------------------------------------#
 
@@ -196,34 +221,42 @@ if [ $? -ne 0 ]; then
     fi
 fi
 
-#-----------------------------------------------------------------------------#
-# crb repo
-#-----------------------------------------------------------------------------#
-dnf config-manager --set-enabled crb | tee -a $LOGFILE
-if [ $? -eq 0 ]; then
-    logthis "crb repo enabled"
-else
-    logthis "ERROR: crb repo enable failed"
-    logthis "^^^^^^^^^^ SCRIPT ABORTED ^^^^^^^^^^"
-    exit 1
-fi
 
-#-----------------------------------------------------------------------------#
-# php 8.1 
-#-----------------------------------------------------------------------------#
-dnf module -y reset php | tee -a $LOGFILE
-if [ $? -ne 0 ]; then
-    logthis "ERROR: Reset php dnf module failed"
-    logthis "^^^^^^^^^^ SCRIPT ABORTED ^^^^^^^^^^"
-    exit 1
-fi
-dnf module -y enable php:8.1 | tee -a $LOGFILE
-if [ $? -eq 0 ]; then
-    logthis "php 8.1 stream enabled"
+if [[ $RELEASE -eq 9 ]]; then
+    #-----------------------------------------------------------------------------#
+    # crb repo
+    #-----------------------------------------------------------------------------#
+    dnf config-manager --set-enabled crb | tee -a $LOGFILE
+    if [ $? -eq 0 ]; then
+        logthis "crb repo enabled"
+    else
+        logthis "ERROR: crb repo enable failed"
+        logthis "^^^^^^^^^^ SCRIPT ABORTED ^^^^^^^^^^"
+        exit 1
+    fi
+
+    #-----------------------------------------------------------------------------#
+    # php 8.1 
+    #-----------------------------------------------------------------------------#
+    dnf module -y reset php | tee -a $LOGFILE
+    if [ $? -ne 0 ]; then
+        logthis "ERROR: Reset php dnf module failed"
+        logthis "^^^^^^^^^^ SCRIPT ABORTED ^^^^^^^^^^"
+        exit 1
+    fi
+    dnf module -y enable php:8.1 | tee -a $LOGFILE
+    if [ $? -eq 0 ]; then
+        logthis "php 8.1 stream enabled"
+    else
+        logthis "ERROR: php 8.1 stream enable failed"
+        logthis "^^^^^^^^^^ SCRIPT ABORTED ^^^^^^^^^^"
+        exit 1
+    fi
 else
-    logthis "ERROR: php 8.1 stream enable failed"
-    logthis "^^^^^^^^^^ SCRIPT ABORTED ^^^^^^^^^^"
-    exit 1
+    logthis "Enabling CentOS 8 PowerTools Repo"
+    yum -y install 'dnf-command(config-manager)'
+    yum config-manager --set-enabled powertools
+    [ $? -ne 0 ] && exit 1
 fi
 
 #-----------------------------------------------------------------------------#
@@ -240,6 +273,15 @@ fi
 #-----------------------------------------------------------------------------#
 
 #-----------------------------------------------------------------------------#
+# Remove not needed packages
+#-----------------------------------------------------------------------------#
+logthis "Removing conflicting packages"
+yum -y remove postfix >/dev/null 2>&1
+# Ignore return here
+#-----------------------------------------------------------------------------#
+
+
+#-----------------------------------------------------------------------------#
 # install eFa
 #-----------------------------------------------------------------------------#
 logthis "Installing eFa packages (This can take a while)"
@@ -248,9 +290,9 @@ if [ $? -ne 0 ]; then
     if [[ "$action" != "testingnoefa" && "$action" != "devnoefa" ]]; then
         yum -y install eFa | tee -a $LOGFILE
         if [ $? -eq 0 ]; then
-            logthis "eFa5 Installed"
+            logthis "eFa Installed"
         else
-            logthis "ERROR: eFa5 failed to install"
+            logthis "ERROR: eFa failed to install"
             logthis "^^^^^^^^^^ SCRIPT ABORTED ^^^^^^^^^^"
             exit 1
         fi
@@ -288,7 +330,7 @@ fi
 #-----------------------------------------------------------------------------#
 # finalize
 #-----------------------------------------------------------------------------#
-logthis "============  EFA5 BUILD SCRIPT FINISHED  ============"
+logthis "============  EFA BUILD SCRIPT FINISHED  ============"
 logthis "============  PLEASE REBOOT YOUR SYSTEM   ============"
 
 if [[ "$action" == "testing" || "$action" == "production" || "$action" == "dev" ]]; then
