@@ -17,7 +17,7 @@
 # along with this SPEC. If not, see <http://www.gnu.org/licenses/>.
 #-----------------------------------------------------------------------------#
 
-%define releasenum 7
+%define releasenum 8
 
 Name:      eFa
 Summary:   eFa Maintenance rpm
@@ -541,6 +541,9 @@ rm -rf $RPM_BUILD_ROOT
 %attr(0644, root, root) %{_sysconfdir}/logrotate.d/eFa-logrotate
 
 %changelog
+* Tue Jun 11 2024 eFa Project <shawniverson@efa-project.org> - 5.0.0-8
+- Fix MailWatchConf.pm configuration during update
+
 * Sun Jun 09 2024 eFa Project <shawniverson@efa-project.org> - 5.0.0-7
 - Update MailWatch and additional cleanup mariadb recovery
 

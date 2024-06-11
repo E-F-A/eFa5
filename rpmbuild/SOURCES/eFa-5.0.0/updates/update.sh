@@ -100,6 +100,13 @@ if [[ ! -e /etc/sysconfig/eFa-Daily-DMARC ]]; then
   echo 'SENDREPORTS="yes"' > /etc/sysconfig/eFa-Daily-DMARC
 fi
 
+# Ensure MailWatchConf.pm is updated
+if [[ -z $(grep MAILWATCHSQLPWD /usr/share/MailScanner/perl/custom/MailWatchConf.pm) ]]; then
+  sed -i "/^my (\$db_pass) =/ c\my (\$fh);\nmy (\$pw_config) = '/etc/eFa/MailWatch-Config';\nopen(\$fh, \"<\", \$pw_config);\nif(\!\$fh) {\n  MailScanner::Log::WarnLog(\"Unable to open %s to retrieve password\", \$pw_config);\n  return;\n}\nmy (\$db_pass) = grep(/^MAILWATCHSQLPWD/,<\$fh>);\n\$db_pass =~ s/MAILWATCHSQLPWD://;\n\$db_pass =~ s/\\\n//;\nclose(\$fh);" /usr/share/MailScanner/perl/custom/MailWatchConf.pm
+  # Also upgrade the db, just in case
+  /usr/bin/mailwatch/tools/upgrade.php --skip-user-confirm /var/www/html/mailscanner/functions.php
+fi 
+
 # Enable maintenance mode if not enabled
 MAINT=0
 if [[ -f /etc/cron.d/eFa-Monitor.cron ]]; then
