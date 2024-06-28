@@ -29,7 +29,7 @@ Release:   1.eFa%{?dist}
 Group:     System Environment/Daemons
 URL:       https://www.rhyolite.com/dcc
 License:   Copyright (c) 2014 by Rhyolite Software, LLC
-Source0:   https://www.dcc-servers.net/dcc/source/dcc.tar.Z
+Source0:   https://www.dcc-servers.net/dcc/source/old/dcc-%{version}.tar.Z
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 BuildRequires: sendmail-devel
 
