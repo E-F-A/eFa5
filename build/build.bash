@@ -214,15 +214,26 @@ if [[ $RELEASE -eq 9 ]]; then
     #-----------------------------------------------------------------------------#
     # crb repo
     #-----------------------------------------------------------------------------#
-    dnf config-manager --set-enabled crb | tee -a $LOGFILE
-    if [ $? -eq 0 ]; then
-        logthis "crb repo enabled"
+    rpm -q redhat-release >/dev/null 2>&1
+    if [ $? -ne 0 ]; then
+        dnf config-manager --set-enabled crb | tee -a $LOGFILE
+        if [ $? -eq 0 ]; then
+            logthis "crb repo enabled"
+        else
+            logthis "ERROR: crb repo enable failed"
+            logthis "^^^^^^^^^^ SCRIPT ABORTED ^^^^^^^^^^"
+            exit 1
+        fi
     else
-        logthis "ERROR: crb repo enable failed"
-        logthis "^^^^^^^^^^ SCRIPT ABORTED ^^^^^^^^^^"
-        exit 1
+        subscription-manager repos --enable codeready-builder-for-rhel-9-x86_64-rpms
+        if [ $? -eq 0 ]; then
+            logthis "codeready-builder-for-rhel repo enabled"
+        else
+            logthis "ERROR: codeready-builder-for-rhel repo enable failed"
+            logthis "^^^^^^^^^^ SCRIPT ABORTED ^^^^^^^^^^"
+            exit 1
+        fi
     fi
-
     #-----------------------------------------------------------------------------#
     # php 8.1 
     #-----------------------------------------------------------------------------#
