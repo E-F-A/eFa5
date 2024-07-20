@@ -49,6 +49,11 @@ sudo dnf -y install epel-release
 
 sudo dnf config-manager --set-enabled crb
 
+dnf module -y reset php | tee -a $LOGFILE
+[ $? -ne 0 ] && exit 1
+dnf module -y enable php:8.1 | tee -a $LOGFILE
+[ $? -ne 0 ] && exit 1
+
 sudo dnf -y update
 [ $? -ne 0 ] && exit 1
 
