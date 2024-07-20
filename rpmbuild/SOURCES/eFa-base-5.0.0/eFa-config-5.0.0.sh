@@ -116,7 +116,7 @@ fi
 
 # Set eFa-Init to run at first root login:
 # Do not set root default password in rpm phase
-sed -i '1i\\/usr\/sbin\/eFa-Init' /root/.bashrc
+sed -i '1i\if ! [ -z \"\$PS1\" ]; then \/usr\/sbin\/eFa-Init; fi"
 cat >> /usr/sbin/eFaFirstBoot.sh << 'EOF'
 #!/bin/bash
 IP=$(ip add | grep inet | grep -v inet\ 127. | grep -v inet6\ ::1 | awk '{print $2}' | awk -F'/' '{print $1}')
@@ -166,12 +166,13 @@ mkdir -p /etc/systemd/system/mariadb.service.d
 echo -e "[Service]\nTimeoutSec=900\n" > /etc/systemd/system/mariadb.service.d/override.conf
 
 #Fail2Ban
-cat > /etc/fail2ban/jail.d/jail.local << 'EOF'
+cat > /etc/fail2ban/jail.d/efa.local << 'EOF'
 [sshd]
 enabled = true
 
 [postfix-sasl]
 enabled = true
+filter = postfix[mode=auth]
 
 [mailwatch]
 enabled = true
