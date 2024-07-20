@@ -107,6 +107,34 @@ if [[ -z $(grep MAILWATCHSQLPWD /usr/share/MailScanner/perl/custom/MailWatchConf
   /usr/bin/mailwatch/tools/upgrade.php --skip-user-confirm /var/www/html/mailscanner/functions.php
 fi 
 
+# Fix duplicate jail configs
+if [[ -f /etc/fail2ban/jail.d/jail.local ]]; then
+  if [[ -f /etc/fail2ban/jail.d/efa.local ]]; then
+    rm -f /etc/fail2ban/jail.d/jail.local
+  else 
+    mv /etc/fail2ban/jail.d/jail.local /etc/fail2ban/jail.d/efa.local
+  fi
+fi
+
+# Fix symlink and ensure passwords consistent
+if [[ ! -h /etc/mail/spamassassin/mailscanner.cf ]]; then
+  if [[ -f /etc/MailScanner/spamassassin.conf ]]; then
+    if [[ -f /etc/mail/spamassassin/mailscanner.cf ]]; then
+      rm -f /etc/MailScanner/spamassassin.conf.bak >/dev/null 2>&1
+      mv /etc/MailScanner/spamassassin.conf /etc/MailScanner/spamassassin.conf.bak
+      mv /etc/mail/spamassassin/mailscanner.cf /etc/MailScanner/spamassassin.conf
+      if [[ $instancetype != "lxc" ]]; then
+        chcon -t mscan_etc_t /etc/MailScanner/spamassassin.conf
+      fi
+    fi
+    ln -s /etc/mail/spamassassin/mailscanner.cf /etc/MailScanner/spamassassin.conf
+    SAUSERSQLPWD="`grep SAUSERSQLPWD /var/eFa/backup/backup/etc/eFa/SA-Config | sed 's/.*://'`"
+    sed -i "/^bayes_sql_password/ c\bayes_sql_password              $SAUSERSQLPWD" /etc/MailScanner/spamassassin.conf
+    sed -i "/^    user_awl_sql_password/ c\    user_awl_sql_password           $SAUSERSQLPWD" /etc/MailScanner/spamassassin.conf
+    SAUSERSQLPWD=
+  fi
+fi
+
 # Enable maintenance mode if not enabled
 MAINT=0
 if [[ -f /etc/cron.d/eFa-Monitor.cron ]]; then
