@@ -127,8 +127,8 @@ if [[ ! -h /etc/mail/spamassassin/mailscanner.cf ]]; then
         chcon -t mscan_etc_t /etc/MailScanner/spamassassin.conf
       fi
     fi
-    ln -s /etc/mail/spamassassin/mailscanner.cf /etc/MailScanner/spamassassin.conf
-    SAUSERSQLPWD="`grep SAUSERSQLPWD /var/eFa/backup/backup/etc/eFa/SA-Config | sed 's/.*://'`"
+    ln -s /etc/MailScanner/spamassassin.conf /etc/mail/spamassassin/mailscanner.cf
+    SAUSERSQLPWD="`grep SAUSERSQLPWD /etc/eFa/SA-Config | sed 's/.*://'`"
     sed -i "/^bayes_sql_password/ c\bayes_sql_password              $SAUSERSQLPWD" /etc/MailScanner/spamassassin.conf
     sed -i "/^    user_awl_sql_password/ c\    user_awl_sql_password           $SAUSERSQLPWD" /etc/MailScanner/spamassassin.conf
     SAUSERSQLPWD=
