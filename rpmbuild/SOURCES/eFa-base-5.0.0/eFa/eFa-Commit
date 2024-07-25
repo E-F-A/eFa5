@@ -916,8 +916,8 @@ if [[ $finalize -eq 1 ]]; then
   rm -f /etc/issue
   [ $? -ne 0 ] && exit 1
 
-  # Remove EFA-Init from console
-  sed -i '/^if ! [ -z \"\$PS1\" ]; then \/usr\/sbin\/eFa-Init; fi/d" /root/.bashrc
+  # Remove eFa-Init from console
+  sed -i "/^if ! \[ -z \"\$PS1\" \]; then \/usr\/sbin\/eFa-Init; fi/d" /root/.bashrc
   [ $? -ne 0 ] && exit 1
 
   systemctl disable eFaFirstBoot

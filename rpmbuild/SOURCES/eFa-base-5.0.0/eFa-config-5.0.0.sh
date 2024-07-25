@@ -116,7 +116,7 @@ fi
 
 # Set eFa-Init to run at first root login:
 # Do not set root default password in rpm phase
-sed -i '1i\if ! [ -z \"\$PS1\" ]; then \/usr\/sbin\/eFa-Init; fi"
+sed -i "1i\if ! [ -z \"\$PS1\" ]; then \/usr\/sbin\/eFa-Init; fi" /root/.bashrc
 cat >> /usr/sbin/eFaFirstBoot.sh << 'EOF'
 #!/bin/bash
 IP=$(ip add | grep inet | grep -v inet\ 127. | grep -v inet6\ ::1 | awk '{print $2}' | awk -F'/' '{print $1}')
