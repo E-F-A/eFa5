@@ -90,10 +90,14 @@ execcmd
 
 if [[ -z $(grep smtpd_forbid_bare_newline /etc/postfix/main.cf) ]]; then
     # Protect against SMTP smuggling
-    postconf -e "smtpd_forbid_unauth_pipelining = yes"
-    postconf -e "smtpd_discard_ehlo_keywords = chunking, silent-discard"
-    postconf -e "smtpd_forbid_bare_newline = yes"
-    postconf -e "smtpd_forbid_bare_newline_exclusions = \$mynetworks"
+    cmd='postconf -e "smtpd_forbid_unauth_pipelining = yes"'
+    execcmd
+    cmd='postconf -e "smtpd_discard_ehlo_keywords = chunking, silent-discard"'
+    execcmd
+    cmd='postconf -e "smtpd_forbid_bare_newline = yes"'
+    execcmd
+    cmd='postconf -e "smtpd_forbid_bare_newline_exclusions = \$mynetworks"'
+    execcmd
 fi
 
 if [[ ! -e /etc/sysconfig/eFa-Daily-DMARC ]]; then
@@ -102,17 +106,21 @@ fi
 
 # Ensure MailWatchConf.pm is updated
 if [[ -z $(grep MAILWATCHSQLPWD /usr/share/MailScanner/perl/custom/MailWatchConf.pm) ]]; then
-  sed -i "/^my (\$db_pass) =/ c\my (\$fh);\nmy (\$pw_config) = '/etc/eFa/MailWatch-Config';\nopen(\$fh, \"<\", \$pw_config);\nif(\!\$fh) {\n  MailScanner::Log::WarnLog(\"Unable to open %s to retrieve password\", \$pw_config);\n  return;\n}\nmy (\$db_pass) = grep(/^MAILWATCHSQLPWD/,<\$fh>);\n\$db_pass =~ s/MAILWATCHSQLPWD://;\n\$db_pass =~ s/\\\n//;\nclose(\$fh);" /usr/share/MailScanner/perl/custom/MailWatchConf.pm
+  cmd='sed -i "/^my (\$db_pass) =/ c\my (\$fh);\nmy (\$pw_config) = '/etc/eFa/MailWatch-Config';\nopen(\$fh, \"<\", \$pw_config);\nif(\!\$fh) {\n  MailScanner::Log::WarnLog(\"Unable to open %s to retrieve password\", \$pw_config);\n  return;\n}\nmy (\$db_pass) = grep(/^MAILWATCHSQLPWD/,<\$fh>);\n\$db_pass =~ s/MAILWATCHSQLPWD://;\n\$db_pass =~ s/\\\n//;\nclose(\$fh);" /usr/share/MailScanner/perl/custom/MailWatchConf.pm'
+  execcmd
   # Also upgrade the db, just in case
-  /usr/bin/mailwatch/tools/upgrade.php --skip-user-confirm /var/www/html/mailscanner/functions.php
+  cmd='/usr/bin/mailwatch/tools/upgrade.php --skip-user-confirm /var/www/html/mailscanner/functions.php'
+  execcmd
 fi 
 
 # Fix duplicate jail configs
 if [[ -f /etc/fail2ban/jail.d/jail.local ]]; then
   if [[ -f /etc/fail2ban/jail.d/efa.local ]]; then
-    rm -f /etc/fail2ban/jail.d/jail.local
+    cmd='rm -f /etc/fail2ban/jail.d/jail.local;'
+    execcmd
   else 
-    mv /etc/fail2ban/jail.d/jail.local /etc/fail2ban/jail.d/efa.local
+    cmd='mv /etc/fail2ban/jail.d/jail.local /etc/fail2ban/jail.d/efa.local'
+    execcmd
   fi
 fi
 
@@ -121,19 +129,54 @@ if [[ ! -h /etc/mail/spamassassin/mailscanner.cf ]]; then
   if [[ -f /etc/MailScanner/spamassassin.conf ]]; then
     if [[ -f /etc/mail/spamassassin/mailscanner.cf ]]; then
       rm -f /etc/MailScanner/spamassassin.conf.bak >/dev/null 2>&1
-      mv /etc/MailScanner/spamassassin.conf /etc/MailScanner/spamassassin.conf.bak
-      mv /etc/mail/spamassassin/mailscanner.cf /etc/MailScanner/spamassassin.conf
+      cmd='mv /etc/MailScanner/spamassassin.conf /etc/MailScanner/spamassassin.conf.bak'
+      execcmd
+      cmd='mv /etc/mail/spamassassin/mailscanner.cf /etc/MailScanner/spamassassin.conf'
+      execcmd
       if [[ $instancetype != "lxc" ]]; then
-        chcon -t mscan_etc_t /etc/MailScanner/spamassassin.conf
+        cmd='chcon -t mscan_etc_t /etc/MailScanner/spamassassin.conf'
+        execcmd
       fi
     fi
-    ln -s /etc/MailScanner/spamassassin.conf /etc/mail/spamassassin/mailscanner.cf
-    SAUSERSQLPWD="`grep SAUSERSQLPWD /etc/eFa/SA-Config | sed 's/.*://'`"
-    sed -i "/^bayes_sql_password/ c\bayes_sql_password              $SAUSERSQLPWD" /etc/MailScanner/spamassassin.conf
-    sed -i "/^    user_awl_sql_password/ c\    user_awl_sql_password           $SAUSERSQLPWD" /etc/MailScanner/spamassassin.conf
+    cmd='ln -s /etc/mail/spamassassin/mailscanner.cf /etc/MailScanner/spamassassin.conf'
+    execcmd
+    SAUSERSQLPWD="`grep SAUSERSQLPWD /var/eFa/backup/backup/etc/eFa/SA-Config | sed 's/.*://'`"
+    cmd="sed -i \"/^bayes_sql_password/ c\bayes_sql_password              $SAUSERSQLPWD\" /etc/MailScanner/spamassassin.conf"
+    execcmd
+    cmd="sed -i \"/^    user_awl_sql_password/ c\    user_awl_sql_password           $SAUSERSQLPWD\" /etc/MailScanner/spamassassin.conf"
+    execcmd
     SAUSERSQLPWD=
   fi
 fi
+
+# Create script to reset access
+if [[ ! -e /usr/sbin/checkqueues ]]; then
+  cat > /usr/sbin/checkqueues << 'EOF'
+#!/bin/bash
+if [[ $(stat -c '%G' /var/spool/postfix/incoming) != 'mtagroup' ]]; then
+    chown -R postfix:mtagroup /var/spool/postfix/incoming
+    chmod -R 750 /var/spool/postfix/incoming
+fi
+if [[ $(stat -c '%G' /var/spool/postfix/hold) != 'mtagroup' ]]; then
+    chown -R postfix:mtagroup /var/spool/postfix/hold
+    chmod -R 750 /var/spool/postfix/hold
+fi
+EOF
+
+  cmd='chmod +x /usr/sbin/checkqueues'
+  execcmd
+
+# Create a cron to reset access to queues in case postfix updates
+  cat > /etc/cron.d/checkqueues << 'EOF'
+* * * * * root /usr/sbin/checkqueues
+EOF
+fi
+
+# Loosen Serializer cache
+cmd='chmod 775 /var/www/html/mailscanner/lib/htmlpurifier/standalone/HTMLPurifier/DefinitionCache/Serializer'
+execcmd
+cmd='chgrp apache /var/www/html/mailscanner/lib/htmlpurifier/standalone/HTMLPurifier/DefinitionCache/Serializer'
+execcmd
 
 # Enable maintenance mode if not enabled
 MAINT=0

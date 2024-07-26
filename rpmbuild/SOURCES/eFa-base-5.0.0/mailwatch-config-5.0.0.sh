@@ -64,6 +64,26 @@ chown -R postfix:mtagroup /var/spool/postfix/incoming
 chmod -R 750 /var/spool/postfix/hold
 chmod -R 750 /var/spool/postfix/incoming
 
+# Create script to reset access
+cat > /usr/sbin/checkqueues << 'EOF'
+#!/bin/bash
+if [[ $(stat -c '%G' /var/spool/postfix/incoming) != 'mtagroup' ]]; then
+    chown -R postfix:mtagroup /var/spool/postfix/incoming
+    chmod -R 750 /var/spool/postfix/incoming
+fi
+if [[ $(stat -c '%G' /var/spool/postfix/hold) != 'mtagroup' ]]; then
+    chown -R postfix:mtagroup /var/spool/postfix/hold
+    chmod -R 750 /var/spool/postfix/hold
+fi
+EOF
+chmod +x /usr/sbin/checkqueues
+
+# Create a cron to reset access to above dirs in case postfix updates
+cat > /etc/cron.d/checkqueues << 'EOF'
+* * * * * root /usr/sbin/checkqueues
+EOF
+
+
 # EFA MSRE Support
 sed -i "/^define('MSRE'/ c\define('MSRE', true);" /var/www/html/mailscanner/conf.php
 chgrp -R apache /etc/MailScanner/rules
@@ -73,6 +93,10 @@ chmod g+rw /etc/MailScanner/rules/*.rules
 # Ensure temp and images are set 
 chgrp -R apache /var/www/html/mailscanner/images
 chgrp -R apache /var/www/html/mailscanner/temp
+
+# Loosen Serializer cache
+chmod 775 /var/www/html/mailscanner/lib/htmlpurifier/standalone/HTMLPurifier/DefinitionCache/Serializer
+chgrp apache /var/www/html/mailscanner/lib/htmlpurifier/standalone/HTMLPurifier/DefinitionCache/Serializer
 
 echo "Configuring MailWatch...done"
 
