@@ -178,6 +178,12 @@ execcmd
 cmd='chgrp apache /var/www/html/mailscanner/lib/htmlpurifier/standalone/HTMLPurifier/DefinitionCache/Serializer'
 execcmd
 
+# Ensure mailwatch permissions are correct for images and tmp
+cmd='chgrp -R apache /var/www/html/mailscanner/images'
+execcmd
+cmd='chgrp -R apache /var/www/html/mailscanner/temp'
+execcmd
+
 # Enable maintenance mode if not enabled
 MAINT=0
 if [[ -f /etc/cron.d/eFa-Monitor.cron ]]; then
