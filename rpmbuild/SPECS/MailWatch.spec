@@ -28,7 +28,7 @@ Summary:       MailWatch Web Front-End for MailScanner
 Name:          MailWatch
 Version:       1.2.23
 Epoch:         1
-Release:       2.eFa%{?dist}
+Release:       3.eFa%{?dist}
 License:       GNU GPL v2
 Group:         Applications/Utilities
 URL:           https://github.com/mailwatch/MailWatch
@@ -77,7 +77,7 @@ cat > %{buildroot}%{_sysconfdir}/cron.daily/mailwatch << 'EOF'
 #!/bin/bash
 /usr/bin/mailwatch/tools/Cron_jobs/mailwatch_quarantine_report.php >/dev/null 2>&1
 /usr/bin/mailwatch/tools/Cron_jobs/mailwatch_quarantine_maint.php --clean >/dev/null 2>&1
-/usr/bin/mailwatch/tools/Cron_jobs/mailwatch_db_clean.php >/dev/null 2>&1
+/usr/bin/mailwatch/tools/Cron_jobs/mailwatch_db_clean.php
 MYSQLPW=`grep MAILWATCHSQLPWD /etc/eFa/MailWatch-Config | awk -F':' '{print $2}'` 
 mysql -u mailwatch -p$MYSQLPW --database=mailscanner -e "DELETE FROM mtalog_ids WHERE smtp_id not in (SELECT msg_id FROM mtalog);" >/dev/null 2>&1
 MYSQLPW=
@@ -316,6 +316,9 @@ chgrp apache %{_localstatedir}/www/html/mailscanner/temp
 %{_localstatedir}/www/html/mailscanner/viewpart.php
 
 %changelog
+* Fri Jul 26 2024 Shawn Iverson <shawniverson@efa-project.org> - 1.2.23-3
+- Don't suppress errors from mailwatch_db_clean.php
+
 * Sun Jun 09 2024 Shawn Iverson <shawniverson@efa-project.org> - 1.2.23-2
 - Additional cleanup for mtalog_ids
 
