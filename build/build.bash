@@ -225,13 +225,24 @@ if [[ $RELEASE -eq 9 ]]; then
             exit 1
         fi
     else
-        subscription-manager repos --enable codeready-builder-for-rhel-9-x86_64-rpms
-        if [ $? -eq 0 ]; then
-            logthis "codeready-builder-for-rhel repo enabled"
+        if grep -q "Oracle Linux" /etc/os-release; then
+            dnf config-manager --set-enabled ol9_codeready_builder | tee -a $LOGFILE
+            if [ $? -eq 0 ]; then
+                logthis "ol9_codeready_builder repo enabled"
+            else
+                logthis "ERROR: ol9_codeready_builder repo enable failed"
+                logthis "^^^^^^^^^^ SCRIPT ABORTED ^^^^^^^^^^"
+                exit 1
+            fi
         else
-            logthis "ERROR: codeready-builder-for-rhel repo enable failed"
-            logthis "^^^^^^^^^^ SCRIPT ABORTED ^^^^^^^^^^"
-            exit 1
+            subscription-manager repos --enable codeready-builder-for-rhel-9-x86_64-rpms
+            if [ $? -eq 0 ]; then
+                logthis "codeready-builder-for-rhel repo enabled"
+            else
+                logthis "ERROR: codeready-builder-for-rhel repo enable failed"
+                logthis "^^^^^^^^^^ SCRIPT ABORTED ^^^^^^^^^^"
+                exit 1
+            fi
         fi
     fi
     #-----------------------------------------------------------------------------#
